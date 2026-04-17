@@ -51,7 +51,7 @@
     <div id="search-section">
         <div class="card">
             <h2>🔍 ค้นหา Link การอภิปราย</h2>
-            <input type="text" id="searchInput" placeholder="พิมพ์คำที่ต้องการค้นหา...">
+            <input type="text" id="searchInput" placeholder="พิมพ์คำที่ต้องการค้นหา..." oninput="checkInput()">
             <div class="btn-group">
                 <button class="btn-primary" onclick="startSearch()"><i data-lucide="search" class="icon"></i> ค้นหา</button>
                 <button class="btn-secondary" onclick="resetSearch()"><i data-lucide="refresh-cw" class="icon"></i> รีเซ็ต</button>
@@ -96,24 +96,42 @@
 
     let allData = [];
 
+    // ฟังก์ชันช่วยแปลง วัน/เดือน/ปี พ.ศ. เป็นค่าที่เปรียบเทียบได้
+    function parseThaiDate(dateStr) {
+        if (!dateStr) return 0;
+        try {
+            const parts = dateStr.split('/');
+            if (parts.length !== 3) return 0;
+            const day = parseInt(parts[0]);
+            const month = parseInt(parts[1]) - 1;
+            const year = parseInt(parts[2]) - 543; // แปลง พ.ศ. เป็น ค.ศ.
+            return new Date(year, month, day).getTime();
+        } catch (e) { return 0; }
+    }
+
     function loadData() {
-        // ดึงข้อมูลจาก Path 'MixLinks'
         window.db.ref('MixLinks').on('value', snapshot => {
             const val = snapshot.val();
             if (val) {
                 let rawData = Object.values(val).filter(i => i !== null);
                 
-                // เรียงลำดับ spkdate ใหม่ไปเก่า
+                // เรียงลำดับจากใหม่ไปเก่าตาม spkdate
                 rawData.sort((a, b) => {
-                    let dateA = a.spkdate ? new Date(a.spkdate) : new Date(0);
-                    let dateB = b.spkdate ? new Date(b.spkdate) : new Date(0);
-                    return dateB - dateA;
+                    return parseThaiDate(b.spkdate) - parseThaiDate(a.spkdate);
                 });
                 
                 allData = rawData;
             }
         });
     }
+
+    // ตรวจสอบว่าถ้าช่องว่างให้ปิดการแสดงผล
+    window.checkInput = function() {
+        const query = document.getElementById('searchInput').value.trim();
+        if (query === "") {
+            document.getElementById('results-card').style.display = 'none';
+        }
+    };
 
     window.startSearch = function() {
         const query = document.getElementById('searchInput').value.toLowerCase().trim();

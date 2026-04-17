@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MixLinks - Search System</title>
+    <title>MixLinks - Search System v2.0</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
-    
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
 
@@ -22,13 +21,13 @@
         .btn-group { display: flex; gap: 10px; margin: 10px 0; }
         button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-primary { background: #1a73e8; color: white; flex: 2; }
-        .btn-primary:hover { background: #1557b0; }
         .btn-secondary { background: #e8f0fe; color: #1a73e8; flex: 1; }
-        .btn-secondary:hover { background: #d2e3fc; }
+        .btn-sort { background: #fff; border: 1px solid #1a73e8; color: #1a73e8; width: 100%; margin-bottom: 15px; }
         .btn-logout { background: #f8f9fa; color: #666; width: 100%; margin-top: 15px; font-size: 14px; border: 1px solid #eee; }
+        
         #search-section { display: none; }
-        .result-item { background: #fff; border-bottom: 1px solid #f0f0f0; padding: 15px; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
-        .result-item:hover { background: #fafafa; }
+        .result-count { font-size: 14px; color: #666; margin-bottom: 10px; padding: 0 5px; font-weight: bold; }
+        .result-item { background: #fff; border-bottom: 1px solid #f0f0f0; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
         .info { flex-grow: 1; padding-right: 15px; }
         .link-name { font-weight: bold; font-size: 1.1em; color: #202124; margin-bottom: 4px; }
         .date { font-size: 0.85em; color: #70757a; display: flex; align-items: center; gap: 4px; }
@@ -56,9 +55,16 @@
                 <button class="btn-primary" onclick="startSearch()"><i data-lucide="search" class="icon"></i> ค้นหา</button>
                 <button class="btn-secondary" onclick="resetSearch()"><i data-lucide="refresh-cw" class="icon"></i> รีเซ็ต</button>
             </div>
+            
+            <button class="btn-sort" id="sortBtn" onclick="toggleSort()">
+                <i data-lucide="arrow-down-narrow-wide" class="icon"></i> <span id="sortText">เรียงจาก: ใหม่ไปเก่า</span>
+            </button>
+
             <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
         </div>
-        <div id="results-card" class="card" style="padding: 0; overflow: hidden; display: none;">
+
+        <div id="results-card" class="card" style="padding: 20px 0; overflow: hidden; display: none;">
+            <div id="count-display" class="result-count" style="padding: 0 20px 10px 20px;"></div>
             <div id="results-list"></div>
         </div>
     </div>
@@ -74,6 +80,10 @@
         messagingSenderId: "886580157297",
         appId: "1:886580157297:web:2d843a0f7db6948f9f74d0"
     };
+
+    let allData = [];
+    let filteredData = [];
+    let isNewestFirst = true; // สถานะการเรียงลำดับ
 
     window.onload = function() {
         firebase.initializeApp(firebaseConfig);
@@ -94,115 +104,116 @@
         lucide.createIcons();
     };
 
-    let allData = [];
-
-    // ฟังก์ชันช่วยแปลง วัน/เดือน/ปี พ.ศ. เป็นค่าที่เปรียบเทียบได้
     function parseThaiDate(dateStr) {
         if (!dateStr) return 0;
         try {
+            // รองรับทั้ง ISO (2026-03-24T17:00:00.000Z) และ ไทย (25/03/2569)
+            if (dateStr.includes('T')) return new Date(dateStr).getTime();
             const parts = dateStr.split('/');
             if (parts.length !== 3) return 0;
-            const day = parseInt(parts[0]);
-            const month = parseInt(parts[1]) - 1;
-            const year = parseInt(parts[2]) - 543; // แปลง พ.ศ. เป็น ค.ศ.
-            return new Date(year, month, day).getTime();
+            return new Date(parseInt(parts[2]) - 543, parseInt(parts[1]) - 1, parseInt(parts[0])).getTime();
         } catch (e) { return 0; }
+    }
+
+    function formatThaiDisplay(isoString) {
+        if (!isoString) return '-';
+        try {
+            const date = new Date(isoString);
+            return date.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' });
+        } catch (e) { return isoString; }
     }
 
     function loadData() {
         window.db.ref('MixLinks').on('value', snapshot => {
             const val = snapshot.val();
             if (val) {
-                let rawData = Object.values(val).filter(i => i !== null);
-                
-                // เรียงลำดับจากใหม่ไปเก่าตาม spkdate
-                rawData.sort((a, b) => {
-                    return parseThaiDate(b.spkdate) - parseThaiDate(a.spkdate);
-                });
-                
-                allData = rawData;
+                allData = Object.values(val).filter(i => i !== null);
+                sortCurrentData(); // เรียงลำดับตั้งต้น
             }
         });
     }
 
-    // ตรวจสอบว่าถ้าช่องว่างให้ปิดการแสดงผล
+    window.toggleSort = function() {
+        isNewestFirst = !isNewestFirst;
+        const btnText = document.getElementById('sortText');
+        const sortBtn = document.getElementById('sortBtn');
+        
+        if (isNewestFirst) {
+            btnText.innerText = "เรียงจาก: ใหม่ไปเก่า";
+            sortBtn.innerHTML = `<i data-lucide="arrow-down-narrow-wide" class="icon"></i> <span id="sortText">${btnText.innerText}</span>`;
+        } else {
+            btnText.innerText = "เรียงจาก: เก่าไปใหม่";
+            sortBtn.innerHTML = `<i data-lucide="arrow-up-wide-narrow" class="icon"></i> <span id="sortText">${btnText.innerText}</span>`;
+        }
+        
+        sortCurrentData();
+        if (document.getElementById('results-card').style.display === 'block') {
+            startSearch(); // อัปเดตการแสดงผลทันทีถ้าหน้าจอเปิดอยู่
+        }
+        lucide.createIcons();
+    }
+
+    function sortCurrentData() {
+        allData.sort((a, b) => {
+            const dateA = parseThaiDate(a.spkdate);
+            const dateB = parseThaiDate(b.spkdate);
+            return isNewestFirst ? dateB - dateA : dateA - dateB;
+        });
+    }
+
     window.checkInput = function() {
-        const query = document.getElementById('searchInput').value.trim();
-        if (query === "") {
+        if (document.getElementById('searchInput').value.trim() === "") {
             document.getElementById('results-card').style.display = 'none';
         }
     };
 
     window.startSearch = function() {
         const query = document.getElementById('searchInput').value.toLowerCase().trim();
-        if (query === "") {
-            document.getElementById('results-card').style.display = 'none';
-            return;
-        }
+        if (query === "") return;
 
         const terms = query.split(' ').filter(t => t !== '');
-        const filtered = allData.filter(item => {
+        filteredData = allData.filter(item => {
             const name = (item.linkname || "").toLowerCase();
             return terms.every(term => name.includes(term));
         });
 
-        displayResults(filtered);
-        document.getElementById('results-card').style.display = 'block';
+        displayResults(filteredData);
     };
 
-    // ฟังก์ชันสำหรับแปลง ISO Date (UTC) ให้เป็นวันที่แบบไทย (Local Time)
-function formatThaiDate(isoString) {
-    if (!isoString) return '-';
-    try {
-        const date = new Date(isoString);
-        // ใช้ toLocaleDateString เพื่อบังคับให้เป็น Timezone ของไทย (Asia/Bangkok)
-        return date.toLocaleDateString('th-TH', {
-            year: 'numeric',
-            month: 'numeric',
-            day: 'numeric',
-            timeZone: 'Asia/Bangkok' // บังคับ Timezone
-        });
-    } catch (e) {
-        return isoString; // ถ้าแปลงไม่ได้ให้ส่งค่าเดิมกลับ
-    }
-}
-
-// ในส่วน displayResults ให้เรียกใช้ฟังก์ชัน formatThaiDate
-function displayResults(items) {
-    const container = document.getElementById('results-list');
-    container.innerHTML = '';
-
-    if (items.length === 0) {
-        container.innerHTML = '<div style="padding:40px; text-align:center; color:#888;">ไม่พบข้อมูล</div>';
-        return;
-    }
-
-    items.forEach((item) => {
-        const div = document.createElement('div');
-        div.className = 'result-item';
-        const isLink = item.link && item.link.startsWith('http');
+    function displayResults(items) {
+        const container = document.getElementById('results-list');
+        const countDisplay = document.getElementById('count-display');
+        container.innerHTML = '';
         
-        // แก้ไขจุดนี้: นำ spkdate มาผ่านฟังก์ชัน formatThaiDate ก่อนแสดงผล
-        const displayDate = formatThaiDate(item.spkdate);
+        document.getElementById('results-card').style.display = 'block';
+        countDisplay.innerText = `พบทั้งหมด ${items.length} รายการ`;
 
-        const actionButtons = isLink ? `
-            <div class="actions">
-                <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" title="Copy"><i data-lucide="copy" class="icon"></i></button>
-                <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')" title="Open"><i data-lucide="external-link" class="icon"></i></button>
-            </div>
-        ` : '';
+        if (items.length === 0) {
+            container.innerHTML = '<div style="padding:40px; text-align:center; color:#888;">ไม่พบข้อมูล</div>';
+            return;
+        }
 
-        div.innerHTML = `
-            <div class="info">
-                <div class="link-name">${item.linkname || 'ไม่ระบุชื่อ'}</div>
-                <div class="date"><i data-lucide="calendar" style="width:14px;"></i> ${displayDate}</div>
-            </div>
-            ${actionButtons}
-        `;
-        container.appendChild(div);
-    });
-    lucide.createIcons();
-}
+        items.forEach((item) => {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            const actionButtons = item.link ? `
+                <div class="actions">
+                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')"><i data-lucide="copy" class="icon"></i></button>
+                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')"><i data-lucide="external-link" class="icon"></i></button>
+                </div>
+            ` : '';
+
+            div.innerHTML = `
+                <div class="info">
+                    <div class="link-name">${item.linkname || 'ไม่ระบุชื่อ'}</div>
+                    <div class="date"><i data-lucide="calendar" style="width:14px;"></i> ${formatThaiDisplay(item.spkdate)}</div>
+                </div>
+                ${actionButtons}
+            `;
+            container.appendChild(div);
+        });
+        lucide.createIcons();
+    }
 
     window.resetSearch = function() {
         document.getElementById('searchInput').value = '';
@@ -210,14 +221,12 @@ function displayResults(items) {
     };
 
     window.handleAction = function(name, url, type) {
-        const user = window.auth.currentUser;
         window.db.ref('logs').push({
-            user: user ? user.email : 'unknown',
+            user: window.auth.currentUser.email,
             linkname: name,
             action: type,
             timestamp: new Date().toISOString()
         });
-
         if (type === 'copy') {
             navigator.clipboard.writeText(url).then(() => alert('คัดลอกแล้ว!'));
         } else {
@@ -228,12 +237,10 @@ function displayResults(items) {
     window.login = function() {
         const email = document.getElementById('email').value;
         const pass = document.getElementById('password').value;
-        window.auth.signInWithEmailAndPassword(email, pass).catch(err => alert("รหัสผ่านไม่ถูกต้อง"));
+        window.auth.signInWithEmailAndPassword(email, pass).catch(() => alert("เข้าสู่ระบบไม่สำเร็จ"));
     };
 
-    window.logout = function() {
-        window.auth.signOut();
-    };
+    window.logout = function() { window.auth.signOut(); };
 
     document.getElementById('searchInput').addEventListener('keypress', e => {
         if (e.key === 'Enter') startSearch();

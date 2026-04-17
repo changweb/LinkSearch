@@ -115,7 +115,7 @@
 
     // ดึงข้อมูลจากฐานข้อมูล
     function loadData() {
-        const dataRef = window.db.ref('/'); // แก้ 'data' เป็น '/' ถ้าข้อมูลอยู่ที่หน้าแรกสุด data
+        const dataRef = window.db.ref('data'); // แก้ 'data' เป็น '/' ถ้าข้อมูลอยู่ที่หน้าแรกสุด data
         dataRef.on('value', snapshot => {
             const val = snapshot.val();
             // แปลงข้อมูลเป็น Array และกรองค่าว่าง

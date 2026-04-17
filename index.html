@@ -1,3 +1,59 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MixLinks - Secure Search</title>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: 'Chakra Petch', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: auto; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #1a73e8; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-logout { background: #ff4d4d; color: white; margin-top: 20px; }
+        
+        /* Search Section */
+        #search-section { display: none; }
+        .result-item { background: #fff; border-bottom: 1px solid #eee; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .result-item:last-child { border-bottom: none; }
+        .info { flex-grow: 1; }
+        .link-name { font-weight: bold; font-size: 1.1em; color: #333; }
+        .date { font-size: 0.85em; color: #888; }
+        .actions { display: flex; gap: 8px; }
+        .btn-icon { background: #f8f9fa; border: 1px solid #ddd; padding: 8px; border-radius: 6px; }
+        .btn-icon:hover { background: #e9ecef; }
+        .icon { width: 18px; height: 18px; color: #555; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="login-section" class="card">
+        <h2>🔒 เข้าสู่ระบบ</h2>
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <button class="btn-primary" onclick="login()">เข้าสู่ระบบ</button>
+    </div>
+
+    <div id="search-section">
+        <div class="card" style="margin-bottom: 20px;">
+            <h2>🔍 ค้นหา Link</h2>
+            <input type="text" id="searchInput" placeholder="พิมพ์ชื่อการอภิปราย (เว้นวรรคเพื่อเพิ่มคำค้น)...">
+            <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+        </div>
+        <div id="results" class="card" style="padding: 0;">
+            <div style="padding: 20px; text-align: center;">กำลังโหลดข้อมูล...</div>
+        </div>
+    </div>
+</div>
+
 <script>
     // 1. ข้อมูล Config ของคุณ (ตรวจสอบให้มั่นใจว่าใส่ API Key และ App ID ครบถ้วน)
     const firebaseConfig = {

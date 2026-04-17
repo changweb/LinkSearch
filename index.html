@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MixLinks - ระบบค้นหาข้อมูล</title>
+    <title>MixLinks - Search System</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
@@ -17,8 +17,6 @@
         .container { max-width: 700px; margin: auto; }
         .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-bottom: 20px; }
         h2 { text-align: center; color: #1a73e8; margin-top: 0; }
-        
-        /* Input & Buttons */
         input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; transition: 0.3s; }
         input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
         .btn-group { display: flex; gap: 10px; margin: 10px 0; }
@@ -28,8 +26,6 @@
         .btn-secondary { background: #e8f0fe; color: #1a73e8; flex: 1; }
         .btn-secondary:hover { background: #d2e3fc; }
         .btn-logout { background: #f8f9fa; color: #666; width: 100%; margin-top: 15px; font-size: 14px; border: 1px solid #eee; }
-        
-        /* Search Results */
         #search-section { display: none; }
         .result-item { background: #fff; border-bottom: 1px solid #f0f0f0; padding: 15px; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
         .result-item:hover { background: #fafafa; }
@@ -40,41 +36,35 @@
         .btn-icon { background: #fff; border: 1px solid #dadce0; padding: 10px; border-radius: 8px; cursor: pointer; color: #5f6368; }
         .btn-icon:hover { background: #f1f3f4; color: #1a73e8; border-color: #1a73e8; }
         .icon { width: 18px; height: 18px; }
-
-        /* Loading Spinner */
-        #loader { text-align: center; padding: 20px; color: #666; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div id="login-section" class="card">
-        <h2>🔒 เข้าสู่ระบบทีมงาน</h2>
+        <h2>🔒 เข้าสู่ระบบ</h2>
         <input type="email" id="email" placeholder="อีเมลผู้ใช้งาน">
         <input type="password" id="password" placeholder="รหัสผ่าน">
-        <button class="btn-primary" onclick="login()">ตกลง</button>
+        <button class="btn-primary" onclick="login()">เข้าสู่ระบบ</button>
     </div>
 
     <div id="search-section">
         <div class="card">
             <h2>🔍 ค้นหา Link การอภิปราย</h2>
-            <input type="text" id="searchInput" placeholder="พิมพ์ชื่อเรื่อง (เว้นวรรคเพื่อเพิ่มคำค้น)...">
+            <input type="text" id="searchInput" placeholder="พิมพ์คำที่ต้องการค้นหา...">
             <div class="btn-group">
                 <button class="btn-primary" onclick="startSearch()"><i data-lucide="search" class="icon"></i> ค้นหา</button>
                 <button class="btn-secondary" onclick="resetSearch()"><i data-lucide="refresh-cw" class="icon"></i> รีเซ็ต</button>
             </div>
             <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
         </div>
-
-        <div id="results-card" class="card" style="padding: 0; overflow: hidden;">
-            <div id="loader">กำลังดึงข้อมูล...</div>
+        <div id="results-card" class="card" style="padding: 0; overflow: hidden; display: none;">
             <div id="results-list"></div>
         </div>
     </div>
 </div>
 
 <script>
-    // --- ตั้งค่า Firebase ---
     const firebaseConfig = {
         apiKey: "AIzaSyCN3DS1X6pRi6LxckAitWHmLmsnx5WF7XA",
         authDomain: "linksearch-84695.firebaseapp.com",
@@ -85,18 +75,11 @@
         appId: "1:886580157297:web:2d843a0f7db6948f9f74d0"
     };
 
-    // รอให้หน้าเว็บโหลดเสร็จก่อนเริ่มทำงาน
     window.onload = function() {
-        if (typeof firebase === 'undefined') {
-            alert("Firebase SDK โหลดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-            return;
-        }
-
         firebase.initializeApp(firebaseConfig);
         window.auth = firebase.auth();
         window.db = firebase.database();
 
-        // ตรวจสอบสถานะการเข้าสู่ระบบ
         window.auth.onAuthStateChanged(user => {
             if (user) {
                 document.getElementById('login-section').style.display = 'none';
@@ -105,45 +88,62 @@
             } else {
                 document.getElementById('login-section').style.display = 'block';
                 document.getElementById('search-section').style.display = 'none';
+                document.getElementById('results-card').style.display = 'none';
             }
         });
-        
         lucide.createIcons();
     };
 
     let allData = [];
 
-    // ดึงข้อมูลจากฐานข้อมูล
     function loadData() {
-        const dataRef = window.db.ref('MixLinks'); // แก้ 'data' เป็น '/' ถ้าข้อมูลอยู่ที่หน้าแรกสุด MixLinks
-        dataRef.on('value', snapshot => {
+        // ดึงข้อมูลจาก Path 'MixLinks'
+        window.db.ref('MixLinks').on('value', snapshot => {
             const val = snapshot.val();
-            // แปลงข้อมูลเป็น Array และกรองค่าว่าง
-            allData = val ? Object.values(val).filter(i => i !== null) : [];
-            // เรียงลำดับจากใหม่ไปเก่า (อิงตามลำดับในฐานข้อมูลที่ส่งมา)
-            allData.reverse(); 
-            displayResults(allData);
-            document.getElementById('loader').style.display = 'none';
-        }, error => {
-            console.error(error);
-            alert("ไม่สามารถดึงข้อมูลได้: " + error.message);
+            if (val) {
+                let rawData = Object.values(val).filter(i => i !== null);
+                
+                // เรียงลำดับ spkdate ใหม่ไปเก่า
+                rawData.sort((a, b) => {
+                    let dateA = a.spkdate ? new Date(a.spkdate) : new Date(0);
+                    let dateB = b.spkdate ? new Date(b.spkdate) : new Date(0);
+                    return dateB - dateA;
+                });
+                
+                allData = rawData;
+            }
         });
     }
 
-    // แสดงผลรายการ
+    window.startSearch = function() {
+        const query = document.getElementById('searchInput').value.toLowerCase().trim();
+        if (query === "") {
+            document.getElementById('results-card').style.display = 'none';
+            return;
+        }
+
+        const terms = query.split(' ').filter(t => t !== '');
+        const filtered = allData.filter(item => {
+            const name = (item.linkname || "").toLowerCase();
+            return terms.every(term => name.includes(term));
+        });
+
+        displayResults(filtered);
+        document.getElementById('results-card').style.display = 'block';
+    };
+
     function displayResults(items) {
         const container = document.getElementById('results-list');
         container.innerHTML = '';
 
         if (items.length === 0) {
-            container.innerHTML = '<div style="padding:40px; text-align:center; color:#888;">ไม่พบข้อมูลที่ค้นหา</div>';
+            container.innerHTML = '<div style="padding:40px; text-align:center; color:#888;">ไม่พบข้อมูล</div>';
             return;
         }
 
         items.forEach((item) => {
             const div = document.createElement('div');
             div.className = 'result-item';
-            
             const isLink = item.link && item.link.startsWith('http');
             const actionButtons = isLink ? `
                 <div class="actions">
@@ -164,62 +164,40 @@
         lucide.createIcons();
     }
 
-    // ฟังก์ชันค้นหา
-    window.startSearch = function() {
-        const query = document.getElementById('searchInput').value.toLowerCase().trim();
-        const terms = query.split(' ').filter(t => t !== '');
-        
-        const filtered = allData.filter(item => {
-            const name = (item.linkname || "").toLowerCase();
-            return terms.every(term => name.includes(term));
-        });
-        displayResults(filtered);
-    };
-
-    // ฟังก์ชันรีเซ็ต
     window.resetSearch = function() {
         document.getElementById('searchInput').value = '';
-        displayResults(allData);
+        document.getElementById('results-card').style.display = 'none';
     };
 
-    // บันทึก Log และดำเนินการ (Copy/Open)
     window.handleAction = function(name, url, type) {
         const user = window.auth.currentUser;
-        const logData = {
+        window.db.ref('logs').push({
             user: user ? user.email : 'unknown',
             linkname: name,
             action: type,
-            timestamp: new Date().toISOString(),
-            dateString: new Date().toLocaleString('th-TH')
-        };
-
-        // ส่ง Log ไปที่ Node ชื่อ 'logs'
-        window.db.ref('logs').push(logData);
+            timestamp: new Date().toISOString()
+        });
 
         if (type === 'copy') {
-            navigator.clipboard.writeText(url).then(() => alert('คัดลอกลิงก์สำเร็จ!'));
+            navigator.clipboard.writeText(url).then(() => alert('คัดลอกแล้ว!'));
         } else {
             window.open(url, '_blank');
         }
     };
 
-    // ฟังก์ชัน Login/Logout
     window.login = function() {
         const email = document.getElementById('email').value;
         const pass = document.getElementById('password').value;
-        if (!email || !pass) { alert("กรุณากรอกข้อมูลให้ครบ"); return; }
-        window.auth.signInWithEmailAndPassword(email, pass).catch(err => alert("รหัสผ่านไม่ถูกต้อง: " + err.message));
+        window.auth.signInWithEmailAndPassword(email, pass).catch(err => alert("รหัสผ่านไม่ถูกต้อง"));
     };
 
     window.logout = function() {
-        if (confirm("ยืนยันการออกจากระบบ?")) window.auth.signOut();
+        window.auth.signOut();
     };
 
-    // เพิ่มฟีเจอร์: กด Enter ในช่องค้นหาแล้วให้เริ่มค้นหาทันที
-    document.getElementById('searchInput').addEventListener('keypress', function (e) {
+    document.getElementById('searchInput').addEventListener('keypress', e => {
         if (e.key === 'Enter') startSearch();
     });
 </script>
-
 </body>
 </html>

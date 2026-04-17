@@ -3,59 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MixLinks - Secure Search</title>
+    <title>MixLinks - ระบบค้นหาข้อมูล</title>
+    
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    
     <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
+
     <style>
-        body { font-family: 'Chakra Petch', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
-        .container { max-width: 600px; margin: auto; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #1a73e8; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: 0.3s; }
-        .btn-primary { background: #1a73e8; color: white; }
-        .btn-primary:hover { background: #1557b0; }
-        .btn-logout { background: #ff4d4d; color: white; margin-top: 20px; }
+        body { font-family: 'Sarabun', sans-serif; background: #f4f7f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 700px; margin: auto; }
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h2 { text-align: center; color: #1a73e8; margin-top: 0; }
         
-        /* Search Section */
+        /* Input & Buttons */
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; transition: 0.3s; }
+        input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+        .btn-group { display: flex; gap: 10px; margin: 10px 0; }
+        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-primary { background: #1a73e8; color: white; flex: 2; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-secondary { background: #e8f0fe; color: #1a73e8; flex: 1; }
+        .btn-secondary:hover { background: #d2e3fc; }
+        .btn-logout { background: #f8f9fa; color: #666; width: 100%; margin-top: 15px; font-size: 14px; border: 1px solid #eee; }
+        
+        /* Search Results */
         #search-section { display: none; }
-        .result-item { background: #fff; border-bottom: 1px solid #eee; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .result-item:last-child { border-bottom: none; }
-        .info { flex-grow: 1; }
-        .link-name { font-weight: bold; font-size: 1.1em; color: #333; }
-        .date { font-size: 0.85em; color: #888; }
+        .result-item { background: #fff; border-bottom: 1px solid #f0f0f0; padding: 15px; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .result-item:hover { background: #fafafa; }
+        .info { flex-grow: 1; padding-right: 15px; }
+        .link-name { font-weight: bold; font-size: 1.1em; color: #202124; margin-bottom: 4px; }
+        .date { font-size: 0.85em; color: #70757a; display: flex; align-items: center; gap: 4px; }
         .actions { display: flex; gap: 8px; }
-        .btn-icon { background: #f8f9fa; border: 1px solid #ddd; padding: 8px; border-radius: 6px; }
-        .btn-icon:hover { background: #e9ecef; }
-        .icon { width: 18px; height: 18px; color: #555; }
+        .btn-icon { background: #fff; border: 1px solid #dadce0; padding: 10px; border-radius: 8px; cursor: pointer; color: #5f6368; }
+        .btn-icon:hover { background: #f1f3f4; color: #1a73e8; border-color: #1a73e8; }
+        .icon { width: 18px; height: 18px; }
+
+        /* Loading Spinner */
+        #loader { text-align: center; padding: 20px; color: #666; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div id="login-section" class="card">
-        <h2>🔒 เข้าสู่ระบบ</h2>
-        <input type="email" id="email" placeholder="Email">
-        <input type="password" id="password" placeholder="Password">
-        <button class="btn-primary" onclick="login()">เข้าสู่ระบบ</button>
+        <h2>🔒 เข้าสู่ระบบทีมงาน</h2>
+        <input type="email" id="email" placeholder="อีเมลผู้ใช้งาน">
+        <input type="password" id="password" placeholder="รหัสผ่าน">
+        <button class="btn-primary" onclick="login()">ตกลง</button>
     </div>
 
     <div id="search-section">
-        <div class="card" style="margin-bottom: 20px;">
-            <h2>🔍 ค้นหา Link</h2>
-            <input type="text" id="searchInput" placeholder="พิมพ์ชื่อการอภิปราย (เว้นวรรคเพื่อเพิ่มคำค้น)...">
+        <div class="card">
+            <h2>🔍 ค้นหา Link การอภิปราย</h2>
+            <input type="text" id="searchInput" placeholder="พิมพ์ชื่อเรื่อง (เว้นวรรคเพื่อเพิ่มคำค้น)...">
+            <div class="btn-group">
+                <button class="btn-primary" onclick="startSearch()"><i data-lucide="search" class="icon"></i> ค้นหา</button>
+                <button class="btn-secondary" onclick="resetSearch()"><i data-lucide="refresh-cw" class="icon"></i> รีเซ็ต</button>
+            </div>
             <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
         </div>
-        <div id="results" class="card" style="padding: 0;">
-            <div style="padding: 20px; text-align: center;">กำลังโหลดข้อมูล...</div>
+
+        <div id="results-card" class="card" style="padding: 0; overflow: hidden;">
+            <div id="loader">กำลังดึงข้อมูล...</div>
+            <div id="results-list"></div>
         </div>
     </div>
 </div>
 
 <script>
-    // 1. ข้อมูล Config ของคุณ (ตรวจสอบให้มั่นใจว่าใส่ API Key และ App ID ครบถ้วน)
+    // --- ตั้งค่า Firebase ---
     const firebaseConfig = {
         apiKey: "AIzaSyCN3DS1X6pRi6LxckAitWHmLmsnx5WF7XA",
         authDomain: "linksearch-84695.firebaseapp.com",
@@ -66,74 +85,67 @@
         appId: "1:886580157297:web:2d843a0f7db6948f9f74d0"
     };
 
-    // 2. เริ่มต้นการทำงาน (แก้ไขจุดที่ Error)
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.database();
-
-    // 3. ระบบตรวจสอบสถานะ Login (ย้ายมาไว้หลังกำหนดตัวแปร auth)
-    auth.onAuthStateChanged(user => {
-        if (user) {
-            document.getElementById('login-section').style.display = 'none';
-            document.getElementById('search-section').style.display = 'block';
-            loadData();
-        } else {
-            document.getElementById('login-section').style.display = 'block';
-            document.getElementById('search-section').style.display = 'none';
-        }
-    });
-
-    // 4. ฟังก์ชันสำหรับปุ่มกด (ต้องใช้ฟังก์ชันปกติเพื่อให้ HTML เรียกเจอ)
-    window.login = function() {
-        const email = document.getElementById('email').value;
-        const pass = document.getElementById('password').value;
-        
-        if(!email || !pass) {
-            alert("กรุณากรอก Email และ Password");
+    // รอให้หน้าเว็บโหลดเสร็จก่อนเริ่มทำงาน
+    window.onload = function() {
+        if (typeof firebase === 'undefined') {
+            alert("Firebase SDK โหลดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
             return;
         }
 
-        auth.signInWithEmailAndPassword(email, pass)
-            .then(() => {
-                console.log("Login Success");
-            })
-            .catch(err => {
-                console.error(err);
-                alert("เข้าสู่ระบบไม่สำเร็จ: " + err.message);
-            });
-    }
+        firebase.initializeApp(firebaseConfig);
+        window.auth = firebase.auth();
+        window.db = firebase.database();
 
-    window.logout = function() {
-        auth.signOut();
-    }
-
-    // --- ส่วนที่เหลือ (loadData, displayResults, handleAction) ให้คงเดิมไว้ครับ ---
-    let allData = [];
-    function loadData() {
-        db.ref('data').on('value', snapshot => {
-            allData = snapshot.val() || [];
-            displayResults(allData);
-        }, error => {
-            console.error("Database Error:", error);
-            if(error.code === "PERMISSION_DENIED") {
-                alert("คุณไม่มีสิทธิ์เข้าถึงฐานข้อมูล กรุณาเช็ค Rules ใน Firebase");
+        // ตรวจสอบสถานะการเข้าสู่ระบบ
+        window.auth.onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('search-section').style.display = 'block';
+                loadData();
+            } else {
+                document.getElementById('login-section').style.display = 'block';
+                document.getElementById('search-section').style.display = 'none';
             }
+        });
+        
+        lucide.createIcons();
+    };
+
+    let allData = [];
+
+    // ดึงข้อมูลจากฐานข้อมูล
+    function loadData() {
+        const dataRef = window.db.ref('data'); // แก้ 'data' เป็น '/' ถ้าข้อมูลอยู่ที่หน้าแรกสุด
+        dataRef.on('value', snapshot => {
+            const val = snapshot.val();
+            // แปลงข้อมูลเป็น Array และกรองค่าว่าง
+            allData = val ? Object.values(val).filter(i => i !== null) : [];
+            // เรียงลำดับจากใหม่ไปเก่า (อิงตามลำดับในฐานข้อมูลที่ส่งมา)
+            allData.reverse(); 
+            displayResults(allData);
+            document.getElementById('loader').style.display = 'none';
+        }, error => {
+            console.error(error);
+            alert("ไม่สามารถดึงข้อมูลได้: " + error.message);
         });
     }
 
+    // แสดงผลรายการ
     function displayResults(items) {
-        const container = document.getElementById('results');
+        const container = document.getElementById('results-list');
         container.innerHTML = '';
-        if (!items || items.length === 0) {
-            container.innerHTML = '<div style="padding:20px; text-align:center;">ไม่พบข้อมูล</div>';
+
+        if (items.length === 0) {
+            container.innerHTML = '<div style="padding:40px; text-align:center; color:#888;">ไม่พบข้อมูลที่ค้นหา</div>';
             return;
         }
 
         items.forEach((item) => {
             const div = document.createElement('div');
             div.className = 'result-item';
+            
             const isLink = item.link && item.link.startsWith('http');
-            const actionHtml = isLink ? `
+            const actionButtons = isLink ? `
                 <div class="actions">
                     <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" title="Copy"><i data-lucide="copy" class="icon"></i></button>
                     <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')" title="Open"><i data-lucide="external-link" class="icon"></i></button>
@@ -142,43 +154,72 @@
 
             div.innerHTML = `
                 <div class="info">
-                    <div class="link-name">${item.linkname || 'ไม่มีชื่อ'}</div>
-                    <div class="date">${item.spkdate || ''}</div>
+                    <div class="link-name">${item.linkname || 'ไม่ระบุชื่อ'}</div>
+                    <div class="date"><i data-lucide="calendar" style="width:14px;"></i> ${item.spkdate || '-'}</div>
                 </div>
-                ${actionHtml}
+                ${actionButtons}
             `;
             container.appendChild(div);
         });
-        if(window.lucide) lucide.createIcons();
+        lucide.createIcons();
     }
 
-    document.getElementById('searchInput').addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
+    // ฟังก์ชันค้นหา
+    window.startSearch = function() {
+        const query = document.getElementById('searchInput').value.toLowerCase().trim();
         const terms = query.split(' ').filter(t => t !== '');
+        
         const filtered = allData.filter(item => {
             const name = (item.linkname || "").toLowerCase();
             return terms.every(term => name.includes(term));
         });
         displayResults(filtered);
-    });
+    };
 
+    // ฟังก์ชันรีเซ็ต
+    window.resetSearch = function() {
+        document.getElementById('searchInput').value = '';
+        displayResults(allData);
+    };
+
+    // บันทึก Log และดำเนินการ (Copy/Open)
     window.handleAction = function(name, url, type) {
-        const user = auth.currentUser;
+        const user = window.auth.currentUser;
         const logData = {
             user: user ? user.email : 'unknown',
             linkname: name,
             action: type,
             timestamp: new Date().toISOString(),
-            dateOnly: new Date().toLocaleDateString('th-TH')
+            dateString: new Date().toLocaleString('th-TH')
         };
 
-        db.ref('logs').push(logData);
+        // ส่ง Log ไปที่ Node ชื่อ 'logs'
+        window.db.ref('logs').push(logData);
 
         if (type === 'copy') {
-            navigator.clipboard.writeText(url);
-            alert('คัดลอกลิงก์สำเร็จ!');
+            navigator.clipboard.writeText(url).then(() => alert('คัดลอกลิงก์สำเร็จ!'));
         } else {
             window.open(url, '_blank');
         }
-    }
+    };
+
+    // ฟังก์ชัน Login/Logout
+    window.login = function() {
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('password').value;
+        if (!email || !pass) { alert("กรุณากรอกข้อมูลให้ครบ"); return; }
+        window.auth.signInWithEmailAndPassword(email, pass).catch(err => alert("รหัสผ่านไม่ถูกต้อง: " + err.message));
+    };
+
+    window.logout = function() {
+        if (confirm("ยืนยันการออกจากระบบ?")) window.auth.signOut();
+    };
+
+    // เพิ่มฟีเจอร์: กด Enter ในช่องค้นหาแล้วให้เริ่มค้นหาทันที
+    document.getElementById('searchInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') startSearch();
+    });
 </script>
+
+</body>
+</html>

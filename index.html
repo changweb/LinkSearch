@@ -150,37 +150,59 @@
         document.getElementById('results-card').style.display = 'block';
     };
 
-    function displayResults(items) {
-        const container = document.getElementById('results-list');
-        container.innerHTML = '';
-
-        if (items.length === 0) {
-            container.innerHTML = '<div style="padding:40px; text-align:center; color:#888;">ไม่พบข้อมูล</div>';
-            return;
-        }
-
-        items.forEach((item) => {
-            const div = document.createElement('div');
-            div.className = 'result-item';
-            const isLink = item.link && item.link.startsWith('http');
-            const actionButtons = isLink ? `
-                <div class="actions">
-                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" title="Copy"><i data-lucide="copy" class="icon"></i></button>
-                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')" title="Open"><i data-lucide="external-link" class="icon"></i></button>
-                </div>
-            ` : '';
-
-            div.innerHTML = `
-                <div class="info">
-                    <div class="link-name">${item.linkname || 'ไม่ระบุชื่อ'}</div>
-                    <div class="date"><i data-lucide="calendar" style="width:14px;"></i> ${item.spkdate || '-'}</div>
-                </div>
-                ${actionButtons}
-            `;
-            container.appendChild(div);
+    // ฟังก์ชันสำหรับแปลง ISO Date (UTC) ให้เป็นวันที่แบบไทย (Local Time)
+function formatThaiDate(isoString) {
+    if (!isoString) return '-';
+    try {
+        const date = new Date(isoString);
+        // ใช้ toLocaleDateString เพื่อบังคับให้เป็น Timezone ของไทย (Asia/Bangkok)
+        return date.toLocaleDateString('th-TH', {
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            timeZone: 'Asia/Bangkok' // บังคับ Timezone
         });
-        lucide.createIcons();
+    } catch (e) {
+        return isoString; // ถ้าแปลงไม่ได้ให้ส่งค่าเดิมกลับ
     }
+}
+
+// ในส่วน displayResults ให้เรียกใช้ฟังก์ชัน formatThaiDate
+function displayResults(items) {
+    const container = document.getElementById('results-list');
+    container.innerHTML = '';
+
+    if (items.length === 0) {
+        container.innerHTML = '<div style="padding:40px; text-align:center; color:#888;">ไม่พบข้อมูล</div>';
+        return;
+    }
+
+    items.forEach((item) => {
+        const div = document.createElement('div');
+        div.className = 'result-item';
+        const isLink = item.link && item.link.startsWith('http');
+        
+        // แก้ไขจุดนี้: นำ spkdate มาผ่านฟังก์ชัน formatThaiDate ก่อนแสดงผล
+        const displayDate = formatThaiDate(item.spkdate);
+
+        const actionButtons = isLink ? `
+            <div class="actions">
+                <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" title="Copy"><i data-lucide="copy" class="icon"></i></button>
+                <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')" title="Open"><i data-lucide="external-link" class="icon"></i></button>
+            </div>
+        ` : '';
+
+        div.innerHTML = `
+            <div class="info">
+                <div class="link-name">${item.linkname || 'ไม่ระบุชื่อ'}</div>
+                <div class="date"><i data-lucide="calendar" style="width:14px;"></i> ${displayDate}</div>
+            </div>
+            ${actionButtons}
+        `;
+        container.appendChild(div);
+    });
+    lucide.createIcons();
+}
 
     window.resetSearch = function() {
         document.getElementById('searchInput').value = '';

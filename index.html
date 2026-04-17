@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MixLinks - Search System v2.0</title>
+    <title>MixLinks - Search System v2.1</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
@@ -12,60 +12,95 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
 
     <style>
-        body { font-family: 'Sarabun', sans-serif; background: #f4f7f9; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 700px; margin: auto; }
-        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        h2 { text-align: center; color: #1a73e8; margin-top: 0; }
+        body { font-family: 'Sarabun', sans-serif; background: #f0f2f5; margin: 0; padding: 0; color: #333; }
+        
+        /* Navigation Bar */
+        .navbar { 
+            background: white; 
+            padding: 10px 20px; 
+            display: none; /* ซ่อนไว้ก่อน Login */
+            justify-content: space-between; 
+            align-items: center; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .nav-user { display: flex; align-items: center; gap: 15px; font-size: 14px; }
+        .user-email { color: #1a73e8; font-weight: bold; }
+        
+        .container { max-width: 700px; margin: 20px auto; padding: 0 15px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h2 { text-align: center; color: #1a73e8; margin-top: 0; font-size: 22px; }
+        
         input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; transition: 0.3s; }
         input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+        
         .btn-group { display: flex; gap: 10px; margin: 10px 0; }
-        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        button { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        
         .btn-primary { background: #1a73e8; color: white; flex: 2; }
         .btn-secondary { background: #e8f0fe; color: #1a73e8; flex: 1; }
-        .btn-sort { background: #fff; border: 1px solid #1a73e8; color: #1a73e8; width: 100%; margin-bottom: 15px; }
-        .btn-logout { background: #f8f9fa; color: #666; width: 100%; margin-top: 15px; font-size: 14px; border: 1px solid #eee; }
+        .btn-sort { background: #fff; border: 1px solid #ddd; color: #5f6368; width: 100%; margin: 5px 0 15px 0; font-size: 14px; }
+        .btn-logout { background: #fff; color: #d93025; border: 1px solid #f8d7da; padding: 6px 12px; font-size: 13px; }
+        .btn-logout:hover { background: #fce8e6; }
         
         #search-section { display: none; }
-        .result-count { font-size: 14px; color: #666; margin-bottom: 10px; padding: 0 5px; font-weight: bold; }
-        .result-item { background: #fff; border-bottom: 1px solid #f0f0f0; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .result-count { font-size: 13px; color: #70757a; margin-bottom: 12px; padding-left: 5px; border-left: 3px solid #1a73e8; }
+        .result-item { background: #fff; border-bottom: 1px solid #f1f3f4; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
         .info { flex-grow: 1; padding-right: 15px; }
-        .link-name { font-weight: bold; font-size: 1.1em; color: #202124; margin-bottom: 4px; }
+        .link-name { font-weight: bold; font-size: 1.05em; color: #202124; margin-bottom: 4px; line-height: 1.4; }
         .date { font-size: 0.85em; color: #70757a; display: flex; align-items: center; gap: 4px; }
+        
         .actions { display: flex; gap: 8px; }
-        .btn-icon { background: #fff; border: 1px solid #dadce0; padding: 10px; border-radius: 8px; cursor: pointer; color: #5f6368; }
+        .btn-icon { background: #fff; border: 1px solid #dadce0; padding: 8px; border-radius: 6px; cursor: pointer; color: #5f6368; }
         .btn-icon:hover { background: #f1f3f4; color: #1a73e8; border-color: #1a73e8; }
-        .icon { width: 18px; height: 18px; }
+        .icon { width: 16px; height: 16px; }
+        .icon-sm { width: 14px; height: 14px; }
     </style>
 </head>
 <body>
 
+<nav class="navbar" id="top-nav">
+    <div style="font-weight: bold; color: #1a73e8;">MixLinks</div>
+    <div class="nav-user">
+        <span class="user-email" id="display-user"></span>
+        <button class="btn-logout" onclick="logout()">
+            <i data-lucide="log-out" class="icon-sm"></i> ออกจากระบบ
+        </button>
+    </div>
+</nav>
+
 <div class="container">
     <div id="login-section" class="card">
-        <h2>🔒 เข้าสู่ระบบ</h2>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <i data-lucide="shield-check" style="width: 48px; height: 48px; color: #1a73e8;"></i>
+        </div>
+        <h2>เข้าสู่ระบบเพื่อใช้งาน</h2>
         <input type="email" id="email" placeholder="อีเมลผู้ใช้งาน">
         <input type="password" id="password" placeholder="รหัสผ่าน">
-        <button class="btn-primary" onclick="login()">เข้าสู่ระบบ</button>
+        <button class="btn-primary" onclick="login()" style="width: 100%;">ตกลง</button>
     </div>
 
     <div id="search-section">
         <div class="card">
-            <h2>🔍 ค้นหา Link การอภิปราย</h2>
-            <input type="text" id="searchInput" placeholder="พิมพ์คำที่ต้องการค้นหา..." oninput="checkInput()">
+            <h2>🔍 ค้นหา Link</h2>
+            <input type="text" id="searchInput" placeholder="พิมพ์ชื่อเรื่องที่ต้องการ..." oninput="checkInput()">
             <div class="btn-group">
                 <button class="btn-primary" onclick="startSearch()"><i data-lucide="search" class="icon"></i> ค้นหา</button>
-                <button class="btn-secondary" onclick="resetSearch()"><i data-lucide="refresh-cw" class="icon"></i> รีเซ็ต</button>
+                <button class="btn-secondary" onclick="resetSearch()"><i data-lucide="refresh-cw" class="icon"></i> ล้าง</button>
             </div>
             
             <button class="btn-sort" id="sortBtn" onclick="toggleSort()">
                 <i data-lucide="arrow-down-narrow-wide" class="icon"></i> <span id="sortText">เรียงจาก: ใหม่ไปเก่า</span>
             </button>
-
-            <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
         </div>
 
-        <div id="results-card" class="card" style="padding: 20px 0; overflow: hidden; display: none;">
-            <div id="count-display" class="result-count" style="padding: 0 20px 10px 20px;"></div>
-            <div id="results-list"></div>
+        <div id="results-card" style="display: none;">
+            <div id="count-display" class="result-count"></div>
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <div id="results-list"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -82,8 +117,7 @@
     };
 
     let allData = [];
-    let filteredData = [];
-    let isNewestFirst = true; // สถานะการเรียงลำดับ
+    let isNewestFirst = true;
 
     window.onload = function() {
         firebase.initializeApp(firebaseConfig);
@@ -91,13 +125,21 @@
         window.db = firebase.database();
 
         window.auth.onAuthStateChanged(user => {
+            const nav = document.getElementById('top-nav');
+            const loginSec = document.getElementById('login-section');
+            const searchSec = document.getElementById('search-section');
+            const displayUser = document.getElementById('display-user');
+
             if (user) {
-                document.getElementById('login-section').style.display = 'none';
-                document.getElementById('search-section').style.display = 'block';
+                nav.style.display = 'flex';
+                loginSec.style.display = 'none';
+                searchSec.style.display = 'block';
+                displayUser.innerText = user.email;
                 loadData();
             } else {
-                document.getElementById('login-section').style.display = 'block';
-                document.getElementById('search-section').style.display = 'none';
+                nav.style.display = 'none';
+                loginSec.style.display = 'block';
+                searchSec.style.display = 'none';
                 document.getElementById('results-card').style.display = 'none';
             }
         });
@@ -107,10 +149,8 @@
     function parseThaiDate(dateStr) {
         if (!dateStr) return 0;
         try {
-            // รองรับทั้ง ISO (2026-03-24T17:00:00.000Z) และ ไทย (25/03/2569)
             if (dateStr.includes('T')) return new Date(dateStr).getTime();
             const parts = dateStr.split('/');
-            if (parts.length !== 3) return 0;
             return new Date(parseInt(parts[2]) - 543, parseInt(parts[1]) - 1, parseInt(parts[0])).getTime();
         } catch (e) { return 0; }
     }
@@ -128,7 +168,7 @@
             const val = snapshot.val();
             if (val) {
                 allData = Object.values(val).filter(i => i !== null);
-                sortCurrentData(); // เรียงลำดับตั้งต้น
+                sortCurrentData();
             }
         });
     }
@@ -147,9 +187,7 @@
         }
         
         sortCurrentData();
-        if (document.getElementById('results-card').style.display === 'block') {
-            startSearch(); // อัปเดตการแสดงผลทันทีถ้าหน้าจอเปิดอยู่
-        }
+        if (document.getElementById('results-card').style.display === 'block') startSearch();
         lucide.createIcons();
     }
 
@@ -172,12 +210,12 @@
         if (query === "") return;
 
         const terms = query.split(' ').filter(t => t !== '');
-        filteredData = allData.filter(item => {
+        const filtered = allData.filter(item => {
             const name = (item.linkname || "").toLowerCase();
             return terms.every(term => name.includes(term));
         });
 
-        displayResults(filteredData);
+        displayResults(filtered);
     };
 
     function displayResults(items) {
@@ -186,7 +224,7 @@
         container.innerHTML = '';
         
         document.getElementById('results-card').style.display = 'block';
-        countDisplay.innerText = `พบทั้งหมด ${items.length} รายการ`;
+        countDisplay.innerText = `รายการที่พบทั้งหมด ${items.length} รายการ`;
 
         if (items.length === 0) {
             container.innerHTML = '<div style="padding:40px; text-align:center; color:#888;">ไม่พบข้อมูล</div>';
@@ -206,7 +244,7 @@
             div.innerHTML = `
                 <div class="info">
                     <div class="link-name">${item.linkname || 'ไม่ระบุชื่อ'}</div>
-                    <div class="date"><i data-lucide="calendar" style="width:14px;"></i> ${formatThaiDisplay(item.spkdate)}</div>
+                    <div class="date"><i data-lucide="calendar" class="icon-sm"></i> ${formatThaiDisplay(item.spkdate)}</div>
                 </div>
                 ${actionButtons}
             `;
@@ -228,7 +266,7 @@
             timestamp: new Date().toISOString()
         });
         if (type === 'copy') {
-            navigator.clipboard.writeText(url).then(() => alert('คัดลอกแล้ว!'));
+            navigator.clipboard.writeText(url).then(() => alert('คัดลอกเรียบร้อย!'));
         } else {
             window.open(url, '_blank');
         }
@@ -237,7 +275,7 @@
     window.login = function() {
         const email = document.getElementById('email').value;
         const pass = document.getElementById('password').value;
-        window.auth.signInWithEmailAndPassword(email, pass).catch(() => alert("เข้าสู่ระบบไม่สำเร็จ"));
+        window.auth.signInWithEmailAndPassword(email, pass).catch(() => alert("อีเมลหรือรหัสผ่านไม่ถูกต้อง"));
     };
 
     window.logout = function() { window.auth.signOut(); };

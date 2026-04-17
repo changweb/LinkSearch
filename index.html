@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MixLinks - Secure Search</title>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: 'Chakra Petch', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: auto; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #1a73e8; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-logout { background: #ff4d4d; color: white; margin-top: 20px; }
+        
+        /* Search Section */
+        #search-section { display: none; }
+        .result-item { background: #fff; border-bottom: 1px solid #eee; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .result-item:last-child { border-bottom: none; }
+        .info { flex-grow: 1; }
+        .link-name { font-weight: bold; font-size: 1.1em; color: #333; }
+        .date { font-size: 0.85em; color: #888; }
+        .actions { display: flex; gap: 8px; }
+        .btn-icon { background: #f8f9fa; border: 1px solid #ddd; padding: 8px; border-radius: 6px; }
+        .btn-icon:hover { background: #e9ecef; }
+        .icon { width: 18px; height: 18px; color: #555; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="login-section" class="card">
+        <h2>🔒 เข้าสู่ระบบ</h2>
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <button class="btn-primary" onclick="login()">เข้าสู่ระบบ</button>
+    </div>
+
+    <div id="search-section">
+        <div class="card" style="margin-bottom: 20px;">
+            <h2>🔍 ค้นหา Link</h2>
+            <input type="text" id="searchInput" placeholder="พิมพ์ชื่อการอภิปราย (เว้นวรรคเพื่อเพิ่มคำค้น)...">
+            <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+        </div>
+        <div id="results" class="card" style="padding: 0;">
+            <div style="padding: 20px; text-align: center;">กำลังโหลดข้อมูล...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. แก้ไขข้อมูลตรงนี้ตาม Firebase Config ของคุณ
+    // Import the functions you need from the SDKs you need
+//import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCN3DS1X6pRi6LxckAitWHmLmsnx5WF7XA",
+  authDomain: "linksearch-84695.firebaseapp.com",
+  databaseURL: "https://linksearch-84695-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "linksearch-84695",
+  storageBucket: "linksearch-84695.firebasestorage.app",
+  messagingSenderId: "886580157297",
+  appId: "1:886580157297:web:2d843a0f7db6948f9f74d0"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // 2. ระบบตรวจสอบสถานะ Login
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('search-section').style.display = 'block';
+            loadData();
+        } else {
+            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('search-section').style.display = 'none';
+        }
+    });
+
+    function login() {
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('password').value;
+        auth.signInWithEmailAndPassword(email, pass).catch(err => alert("เกิดข้อผิดพลาด: " + err.message));
+    }
+
+    function logout() {
+        auth.signOut();
+    }
+
+    // 3. ระบบจัดการข้อมูล
+    let allData = [];
+    function loadData() {
+        db.ref('data').on('value', snapshot => {
+            allData = snapshot.val() || [];
+            displayResults(allData);
+        });
+    }
+
+    function displayResults(items) {
+        const container = document.getElementById('results');
+        container.innerHTML = '';
+        if (items.length === 0) {
+            container.innerHTML = '<div style="padding:20px; text-align:center;">ไม่พบข้อมูล</div>';
+            return;
+        }
+
+        items.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            
+            const isLink = item.link && item.link.startsWith('http');
+            const actionHtml = isLink ? `
+                <div class="actions">
+                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" title="Copy"><i data-lucide="copy" class="icon"></i></button>
+                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')" title="Open"><i data-lucide="external-link" class="icon"></i></button>
+                </div>
+            ` : '';
+
+            div.innerHTML = `
+                <div class="info">
+                    <div class="link-name">${item.linkname}</div>
+                    <div class="date">${item.spkdate || ''}</div>
+                </div>
+                ${actionHtml}
+            `;
+            container.appendChild(div);
+        });
+        lucide.createIcons();
+    }
+
+    // 4. ระบบค้นหาแบบเว้นวรรค
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        const terms = query.split(' ').filter(t => t !== '');
+        const filtered = allData.filter(item => {
+            const name = item.linkname.toLowerCase();
+            return terms.every(term => name.includes(term));
+        });
+        displayResults(filtered);
+    });
+
+    // 5. ระบบบันทึก Log และดำเนินการ
+    function handleAction(name, url, type) {
+        const user = auth.currentUser;
+        const logData = {
+            user: user.email,
+            linkname: name,
+            action: type,
+            timestamp: new Date().toISOString(),
+            dateOnly: new Date().toLocaleDateString('th-TH')
+        };
+
+        // บันทึก Log ไปยัง Node ชื่อ 'logs'
+        db.ref('logs').push(logData);
+
+        if (type === 'copy') {
+            navigator.clipboard.writeText(url);
+            alert('คัดลอกลิงก์สำเร็จ!');
+        } else {
+            window.open(url, '_blank');
+        }
+    }
+</script>
+
+</body>
+</html>

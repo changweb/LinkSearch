@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MixLinks Admin Dashboard</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --primary: #1a73e8; --bg: #f8f9fa; --border: #e0e0e0; }
+        body { font-family: 'Sarabun', sans-serif; background: var(--bg); margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* Navbar */
+        .navbar { background: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); height: 50px; }
+        .nav-user { display: flex; align-items: center; gap: 15px; }
+        .user-email { color: var(--primary); font-weight: bold; font-size: 14px; }
+        .btn-logout { background: #fff; color: #d93025; border: 1px solid #f8d7da; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+
+        /* Main Layout */
+        .main-content { display: flex; flex: 1; overflow: hidden; }
+        .panel { display: flex; flex-direction: column; padding: 20px; overflow-y: auto; }
+        
+        /* Left Side: Search */
+        .left-panel { flex: 1; border-right: 2px solid var(--border); background: #fff; }
+        
+        /* Right Side: Logs */
+        .right-panel { flex: 1.2; background: var(--bg); }
+
+        /* Component Styles */
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid var(--border); }
+        h2 { margin: 0 0 15px 0; font-size: 18px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        
+        input[type="text"], input[type="date"] { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn-group { display: flex; gap: 8px; margin-bottom: 15px; }
+        .btn { padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary { background: #e8f0fe; color: var(--primary); }
+
+        /* Table & Lists */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+        .rank-badge { background: #e8f0fe; color: var(--primary); padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        .action-tag { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+
+        /* Login Overlay */
+        #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay">
+    <div class="login-card">
+        <i data-lucide="lock" style="width: 48px; height: 48px; color: var(--primary); margin-bottom: 15px;"></i>
+        <h2>Admin Login</h2>
+        <input type="email" id="login-email" placeholder="Email" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:8px;">
+        <input type="password" id="login-pass" placeholder="Password" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px;">
+        <button class="btn btn-primary" onclick="login()" style="width:100%; justify-content:center;">เข้าสู่ระบบ</button>
+    </div>
+</div>
+
+<nav class="navbar">
+    <div style="font-weight: bold; color: var(--primary); font-size: 18px;">MixLinks Admin Portal</div>
+    <div class="nav-user">
+        <span class="user-email" id="display-user"></span>
+        <button class="btn-logout" onclick="logout()"><i data-lucide="log-out" style="width:14px;"></i> ออกจากระบบ</button>
+    </div>
+</nav>
+
+<div class="main-content">
+    <div class="panel left-panel">
+        <div class="card">
+            <h2><i data-lucide="search"></i> ค้นหาข้อมูล</h2>
+            <input type="text" id="searchInput" placeholder="พิมพ์เพื่อค้นหา..." oninput="searchData()">
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="sortBtn" onclick="toggleSort()">
+                    <i data-lucide="arrow-down-up"></i> <span id="sortText">ใหม่ไปเก่า</span>
+                </button>
+            </div>
+        </div>
+        <div id="search-results">
+            <div id="search-count" style="font-size:12px; color:#666; margin-bottom:10px;"></div>
+            <div id="results-list"></div>
+        </div>
+    </div>
+
+    <div class="panel right-panel">
+        <div class="card">
+            <h2><i data-lucide="bar-chart-3"></i> รายงานวันนี้</h2>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <input type="date" id="dateFilter" onchange="loadLogs()" style="margin-bottom:0;">
+                <div style="text-align:right; flex:1">
+                    <span style="font-size:12px; color:#666">ยอดกดวันนี้:</span>
+                    <span id="today-count" style="font-size:20px; font-weight:bold; color:var(--primary)">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="padding:0; overflow:hidden;">
+            <div style="padding:15px; background:#f1f3f4; font-weight:bold; font-size:14px; border-bottom:1px solid #ddd;">
+                🔥 ยอดนิยม (ตามวันที่เลือก)
+            </div>
+            <table id="top-table">
+                <thead><tr><th width="40">#</th><th>ไฟล์</th><th width="60">ครั้ง</th></tr></thead>
+                <tbody id="top-body"></tbody>
+            </table>
+        </div>
+
+        <div class="card" style="padding:0; overflow:hidden;">
+            <div style="padding:15px; background:#f1f3f4; font-weight:bold; font-size:14px; border-bottom:1px solid #ddd;">
+                🕒 ประวัติล่าสุด
+            </div>
+            <table id="log-table">
+                <thead><tr><th>เวลา</th><th>ผู้ใช้</th><th>ไฟล์</th><th>Action</th></tr></thead>
+                <tbody id="log-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCN3DS1X6pRi6LxckAitWHmLmsnx5WF7XA",
+        authDomain: "linksearch-84695.firebaseapp.com",
+        databaseURL: "https://linksearch-84695-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "linksearch-84695",
+        storageBucket: "linksearch-84695.appspot.com",
+        messagingSenderId: "886580157297",
+        appId: "1:886580157297:web:2d843a0f7db6948f9f74d0"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    let masterData = [];
+    let isNewestFirst = true;
+
+    // ระบบ Login
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('display-user').innerText = user.email;
+            document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
+            initData();
+        } else {
+            document.getElementById('login-overlay').style.display = 'flex';
+        }
+    });
+
+    function initData() {
+        // ดึงข้อมูลหลักสำหรับค้นหา
+        db.ref('MixLinks').on('value', snap => {
+            masterData = Object.values(snap.val() || {}).filter(i => i !== null);
+            sortMasterData();
+            searchData();
+        });
+        // ดึงข้อมูล Logs
+        loadLogs();
+    }
+
+    // --- ส่วนของ Search (ซ้าย) ---
+    function sortMasterData() {
+        masterData.sort((a, b) => {
+            const da = a.spkdate ? new Date(a.spkdate).getTime() : 0;
+            const db = b.spkdate ? new Date(b.spkdate).getTime() : 0;
+            return isNewestFirst ? db - da : da - db;
+        });
+    }
+
+    function toggleSort() {
+        isNewestFirst = !isNewestFirst;
+        document.getElementById('sortText').innerText = isNewestFirst ? "ใหม่ไปเก่า" : "เก่าไปใหม่";
+        sortMasterData();
+        searchData();
+        lucide.createIcons();
+    }
+
+    function searchData() {
+        const query = document.getElementById('searchInput').value.toLowerCase().trim();
+        const results = masterData.filter(item => (item.linkname || "").toLowerCase().includes(query));
+        const list = document.getElementById('results-list');
+        document.getElementById('search-count').innerText = `พบทั้งหมด ${results.length} รายการ`;
+        
+        list.innerHTML = results.map(item => `
+            <div style="padding:12px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:bold; font-size:14px;">${item.linkname}</div>
+                    <div style="font-size:12px; color:#999;">${new Date(item.spkdate).toLocaleDateString('th-TH')}</div>
+                </div>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" style="background:none; border:1px solid #ddd; padding:5px; border-radius:4px; cursor:pointer;"><i data-lucide="copy" style="width:14px;"></i></button>
+                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')" style="background:none; border:1px solid #ddd; padding:5px; border-radius:4px; cursor:pointer;"><i data-lucide="external-link" style="width:14px;"></i></button>
+                </div>
+            </div>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    // --- ส่วนของ Logs (ขวา) ---
+    function loadLogs() {
+        const targetDate = document.getElementById('dateFilter').value;
+        db.ref('logs').on('value', snap => {
+            const logs = Object.values(snap.val() || {});
+            const filtered = logs.filter(l => new Date(l.timestamp).toISOString().split('T')[0] === targetDate);
+            
+            document.getElementById('today-count').innerText = filtered.length;
+
+            // อันดับยอดนิยม
+            const freq = {};
+            filtered.forEach(l => freq[l.linkname] = (freq[l.linkname] || 0) + 1);
+            const sorted = Object.keys(freq).map(k => ({n:k, c:freq[k]})).sort((a,b)=>b.c-a.c).slice(0,5);
+            document.getElementById('top-body').innerHTML = sorted.map((item, i) => `
+                <tr><td><span class="rank-badge">${i+1}</span></td><td>${item.n}</td><td style="text-align:center"><b>${item.c}</b></td></tr>
+            `).join('');
+
+            // ประวัติล่าสุด (20 อันดับ)
+            const recent = filtered.reverse().slice(0, 15);
+            document.getElementById('log-body').innerHTML = recent.map(l => `
+                <tr>
+                    <td style="color:#888">${new Date(l.timestamp).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</td>
+                    <td>${l.user.split('@')[0]}</td>
+                    <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${l.linkname}</td>
+                    <td><span class="action-tag" style="color:${l.action==='copy'?'#1a73e8':'#34a853'}">${l.action}</span></td>
+                </tr>
+            `).join('');
+        });
+    }
+
+    // Actions
+    function handleAction(name, url, type) {
+        db.ref('logs').push({ user: auth.currentUser.email, linkname: name, action: type, timestamp: new Date().toISOString() });
+        if (type === 'copy') { navigator.clipboard.writeText(url).then(() => alert('คัดลอกแล้ว!')); } 
+        else { window.open(url, '_blank'); }
+    }
+
+    function login() {
+        const e = document.getElementById('login-email').value;
+        const p = document.getElementById('login-pass').value;
+        auth.signInWithEmailAndPassword(e, p).catch(err => alert("ลองใหม่อีกครั้ง: " + err.message));
+    }
+
+    function logout() { auth.signOut(); }
+</script>
+</body>
+</html>

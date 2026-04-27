@@ -20,6 +20,7 @@
         .nav-user { display: flex; align-items: center; gap: 15px; }
         .user-email { color: var(--primary); font-weight: bold; font-size: 14px; }
         .btn-logout { background: #fff; color: #d93025; border: 1px solid #f8d7da; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .btn-logout:hover { background: #fce8e6; }
 
         /* Main Layout */
         .main-content { display: flex; flex: 1; overflow: hidden; }
@@ -56,7 +57,7 @@
 
 <div id="login-overlay">
     <div class="login-card">
-        <i data-lucide="lock" style="width: 48px; height: 48px; color: var(--primary); margin-bottom: 15px;"></i>
+        <i data-lucide="shield-check" style="width: 48px; height: 48px; color: var(--primary); margin-bottom: 15px;"></i>
         <h2>Admin Login</h2>
         <input type="email" id="login-email" placeholder="Email" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:8px;">
         <input type="password" id="login-pass" placeholder="Password" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px;">
@@ -76,54 +77,48 @@
     <div class="panel left-panel">
         <div class="card">
             <h2><i data-lucide="search"></i> ค้นหาข้อมูล</h2>
-            <input type="text" id="searchInput" placeholder="พิมพ์เพื่อค้นหา..." oninput="searchData()">
+            <input type="text" id="searchInput" placeholder="พิมพ์ชื่อเรื่องที่ต้องการค้นหา..." oninput="searchData()">
             <div class="btn-group">
                 <button class="btn btn-secondary" id="sortBtn" onclick="toggleSort()">
-                    <i data-lucide="arrow-down-up"></i> <span id="sortText">ใหม่ไปเก่า</span>
+                    <i data-lucide="arrow-down-narrow-wide"></i> <span id="sortText">เรียงจาก: ใหม่ไปเก่า</span>
                 </button>
             </div>
         </div>
-        <div class="panel left-panel">
-    <div class="card">
-        <h2><i data-lucide="search"></i> ค้นหาข้อมูล</h2>
-        <input type="text" id="searchInput" placeholder="พิมพ์เพื่อค้นหา..." oninput="searchData()">
+        
+        <div id="search-results" style="display: none;">
+            <div id="search-count" style="font-size:13px; color:#666; margin-bottom:10px; font-weight:bold; border-left: 3px solid var(--primary); padding-left: 8px;"></div>
+            <div id="results-list"></div>
         </div>
-    
-    <div id="search-results" style="display: none;">
-        <div id="search-count" style="font-size:12px; color:#666; margin-bottom:10px;"></div>
-        <div id="results-list"></div>
-    </div>
-</div>
     </div>
 
     <div class="panel right-panel">
         <div class="card">
-            <h2><i data-lucide="bar-chart-3"></i> รายงานวันนี้</h2>
+            <h2><i data-lucide="bar-chart-3"></i> รายงานการใช้งาน</h2>
             <div style="display:flex; gap:10px; align-items:center;">
                 <input type="date" id="dateFilter" onchange="loadLogs()" style="margin-bottom:0;">
                 <div style="text-align:right; flex:1">
-                    <span style="font-size:12px; color:#666">ยอดกดวันนี้:</span>
-                    <span id="today-count" style="font-size:20px; font-weight:bold; color:var(--primary)">0</span>
+                    <span style="font-size:13px; color:#666">ยอดกดลิงก์ของวันที่เลือก:</span>
+                    <span id="today-count" style="font-size:24px; font-weight:bold; color:var(--primary); margin-left:8px;">0</span>
                 </div>
             </div>
         </div>
 
         <div class="card" style="padding:0; overflow:hidden;">
-            <div style="padding:15px; background:#f1f3f4; font-weight:bold; font-size:14px; border-bottom:1px solid #ddd;">
-                🔥 ยอดนิยม (ตามวันที่เลือก)
+            <div style="padding:15px; background:#f8f9fa; font-weight:bold; font-size:14px; border-bottom:1px solid #ddd;">
+                🔥 ไฟล์ยอดนิยม (ตามวันที่เลือก)
             </div>
             <table id="top-table">
-                <thead><tr><th width="40">#</th><th>ไฟล์</th><th width="60">ครั้ง</th></tr></thead>
+                <thead><tr><th width="40">#</th><th>ชื่อไฟล์ / หัวข้อ</th><th width="80" style="text-align:center;">จำนวนครั้ง</th></tr></thead>
                 <tbody id="top-body"></tbody>
             </table>
         </div>
 
         <div class="card" style="padding:0; overflow:hidden;">
-            <div style="padding:15px; background:#f1f3f4; font-weight:bold; font-size:14px; border-bottom:1px solid #ddd;">
+            <div style="padding:15px; background:#f8f9fa; font-weight:bold; font-size:14px; border-bottom:1px solid #ddd;">
                 🕒 ประวัติล่าสุด
             </div>
             <table id="log-table">
-                <thead><tr><th>เวลา</th><th>ผู้ใช้</th><th>ไฟล์</th><th>Action</th></tr></thead>
+                <thead><tr><th>เวลา</th><th>ผู้ใช้งาน</th><th>ไฟล์</th><th>การกระทำ</th></tr></thead>
                 <tbody id="log-body"></tbody>
             </table>
         </div>
@@ -160,73 +155,98 @@
         }
     });
 
+    // ฟังก์ชันแปลงวันที่แบบไทย
+    function formatThaiDisplay(isoString) {
+        if (!isoString) return '-';
+        try {
+            const date = new Date(isoString);
+            return date.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' });
+        } catch (e) { return isoString; }
+    }
+
+    // ฟังก์ชันเปรียบเทียบวันที่สำหรับการจัดเรียง
+    function parseThaiDate(dateStr) {
+        if (!dateStr) return 0;
+        try {
+            if (dateStr.includes('T')) return new Date(dateStr).getTime();
+            const parts = dateStr.split('/');
+            return new Date(parseInt(parts[2]) - 543, parseInt(parts[1]) - 1, parseInt(parts[0])).getTime();
+        } catch (e) { return 0; }
+    }
+
     function initData() {
-        // ดึงข้อมูลหลักสำหรับค้นหา
         db.ref('MixLinks').on('value', snap => {
             masterData = Object.values(snap.val() || {}).filter(i => i !== null);
             sortMasterData();
-            searchData();
+            searchData(); // โหลดครั้งแรกจะเข้าเงื่อนไข "ว่างเปล่า" และซ่อนผลลัพธ์
         });
-        // ดึงข้อมูล Logs
         loadLogs();
     }
 
-    // --- ส่วนของ Search (ซ้าย) ---
+    // --- ส่วนของ Search (ฝั่งซ้าย) ---
     function sortMasterData() {
         masterData.sort((a, b) => {
-            const da = a.spkdate ? new Date(a.spkdate).getTime() : 0;
-            const db = b.spkdate ? new Date(b.spkdate).getTime() : 0;
+            const da = parseThaiDate(a.spkdate);
+            const db = parseThaiDate(b.spkdate);
             return isNewestFirst ? db - da : da - db;
         });
     }
 
     function toggleSort() {
         isNewestFirst = !isNewestFirst;
-        document.getElementById('sortText').innerText = isNewestFirst ? "ใหม่ไปเก่า" : "เก่าไปใหม่";
+        document.getElementById('sortText').innerText = isNewestFirst ? "เรียงจาก: ใหม่ไปเก่า" : "เรียงจาก: เก่าไปใหม่";
         sortMasterData();
         searchData();
-        lucide.createIcons();
     }
 
     function searchData() {
         const query = document.getElementById('searchInput').value.toLowerCase().trim();
+        const searchResultsDiv = document.getElementById('search-results');
         const resultsList = document.getElementById('results-list');
-        const searchResultsDiv = document.getElementById('search-results'); // ส่วนที่คุมทั้งจำนวนและรายการ
         
-        // --- เงื่อนไขที่เพิ่มเข้าไป: ถ้าว่างให้ซ่อนทันที ---
+        // กฎเหล็ก: ถ้าช่องค้นหาว่าง ให้ปิดการแสดงผลทันที
         if (query === "") {
             searchResultsDiv.style.display = 'none';
             return;
         }
-        // -------------------------------------------
 
-        const results = masterData.filter(item => (item.linkname || "").toLowerCase().includes(query));
+        const terms = query.split(' ').filter(t => t !== '');
+        const results = masterData.filter(item => {
+            const name = (item.linkname || "").toLowerCase();
+            return terms.every(term => name.includes(term));
+        });
         
-        // แสดงส่วนผลลัพธ์
+        // เปิดการแสดงผล และโชว์ตัวเลข
         searchResultsDiv.style.display = 'block';
         document.getElementById('search-count').innerText = `พบทั้งหมด ${results.length} รายการ`;
         
         if (results.length === 0) {
-            resultsList.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">ไม่พบข้อมูล</div>';
+            resultsList.innerHTML = '<div style="padding:40px; text-align:center; color:#888;">ไม่พบข้อมูลที่คุณค้นหา</div>';
             return;
         }
 
         resultsList.innerHTML = results.map(item => `
-            <div style="padding:12px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+            <div style="background: #fff; padding: 15px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                 <div>
-                    <div style="font-weight:bold; font-size:14px;">${item.linkname}</div>
-                    <div style="font-size:12px; color:#999;">${formatThaiDisplay(item.spkdate)}</div>
+                    <div style="font-weight: bold; font-size: 15px; color: #202124; margin-bottom: 4px;">${item.linkname}</div>
+                    <div style="font-size: 13px; color: #70757a; display: flex; align-items: center; gap: 4px;">
+                        <i data-lucide="calendar" style="width:14px;"></i> ${formatThaiDisplay(item.spkdate)}
+                    </div>
                 </div>
-                <div style="display:flex; gap:5px;">
-                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" title="Copy"><i data-lucide="copy" style="width:14px;"></i></button>
-                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')" title="Open"><i data-lucide="external-link" style="width:14px;"></i></button>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" style="background:#fff; border:1px solid #dadce0; padding:8px; border-radius:6px; cursor:pointer; color:#5f6368;" title="Copy">
+                        <i data-lucide="copy" style="width:16px;"></i>
+                    </button>
+                    <button onclick="handleAction('${item.linkname}', '${item.link}', 'open')" style="background:#fff; border:1px solid #dadce0; padding:8px; border-radius:6px; cursor:pointer; color:#5f6368;" title="Open">
+                        <i data-lucide="external-link" style="width:16px;"></i>
+                    </button>
                 </div>
             </div>
         `).join('');
         lucide.createIcons();
     }
 
-    // --- ส่วนของ Logs (ขวา) ---
+    // --- ส่วนของ Logs (ฝั่งขวา) ---
     function loadLogs() {
         const targetDate = document.getElementById('dateFilter').value;
         db.ref('logs').on('value', snap => {
@@ -239,34 +259,48 @@
             const freq = {};
             filtered.forEach(l => freq[l.linkname] = (freq[l.linkname] || 0) + 1);
             const sorted = Object.keys(freq).map(k => ({n:k, c:freq[k]})).sort((a,b)=>b.c-a.c).slice(0,5);
-            document.getElementById('top-body').innerHTML = sorted.map((item, i) => `
-                <tr><td><span class="rank-badge">${i+1}</span></td><td>${item.n}</td><td style="text-align:center"><b>${item.c}</b></td></tr>
-            `).join('');
+            
+            const topBody = document.getElementById('top-body');
+            if(sorted.length === 0) {
+                topBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888;">ไม่มีข้อมูลการใช้งานในวันนี้</td></tr>';
+            } else {
+                topBody.innerHTML = sorted.map((item, i) => `
+                    <tr><td><span class="rank-badge">${i+1}</span></td><td>${item.n}</td><td style="text-align:center; font-size:14px;"><b>${item.c}</b></td></tr>
+                `).join('');
+            }
 
             // ประวัติล่าสุด (20 อันดับ)
-            const recent = filtered.reverse().slice(0, 15);
+            const recent = filtered.reverse().slice(0, 20);
             document.getElementById('log-body').innerHTML = recent.map(l => `
                 <tr>
-                    <td style="color:#888">${new Date(l.timestamp).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</td>
+                    <td style="color:#70757a; font-size:12px;">${new Date(l.timestamp).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})} น.</td>
                     <td>${l.user.split('@')[0]}</td>
                     <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${l.linkname}</td>
-                    <td><span class="action-tag" style="color:${l.action==='copy'?'#1a73e8':'#34a853'}">${l.action}</span></td>
+                    <td><span class="action-tag" style="background:${l.action==='copy'?'#e8f0fe':'#e6f4ea'}; color:${l.action==='copy'?'#1a73e8':'#1e8e3e'}">${l.action}</span></td>
                 </tr>
             `).join('');
         });
     }
 
-    // Actions
+    // Actions การเปิดลิงก์และบันทึก Log
     function handleAction(name, url, type) {
-        db.ref('logs').push({ user: auth.currentUser.email, linkname: name, action: type, timestamp: new Date().toISOString() });
-        if (type === 'copy') { navigator.clipboard.writeText(url).then(() => alert('คัดลอกแล้ว!')); } 
-        else { window.open(url, '_blank'); }
+        db.ref('logs').push({ 
+            user: auth.currentUser.email, 
+            linkname: name, 
+            action: type, 
+            timestamp: new Date().toISOString() 
+        });
+        if (type === 'copy') { 
+            navigator.clipboard.writeText(url).then(() => alert('คัดลอกลิงก์เรียบร้อยแล้ว!')); 
+        } else { 
+            window.open(url, '_blank'); 
+        }
     }
 
     function login() {
         const e = document.getElementById('login-email').value;
         const p = document.getElementById('login-pass').value;
-        auth.signInWithEmailAndPassword(e, p).catch(err => alert("ลองใหม่อีกครั้ง: " + err.message));
+        auth.signInWithEmailAndPassword(e, p).catch(err => alert("อีเมลหรือรหัสผ่านไม่ถูกต้อง โปรดลองอีกครั้ง"));
     }
 
     function logout() { auth.signOut(); }

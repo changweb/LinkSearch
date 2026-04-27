@@ -83,10 +83,17 @@
                 </button>
             </div>
         </div>
-        <div id="search-results">
-            <div id="search-count" style="font-size:12px; color:#666; margin-bottom:10px;"></div>
-            <div id="results-list"></div>
+        <div class="panel left-panel">
+    <div class="card">
+        <h2><i data-lucide="search"></i> ค้นหาข้อมูล</h2>
+        <input type="text" id="searchInput" placeholder="พิมพ์เพื่อค้นหา..." oninput="searchData()">
         </div>
+    
+    <div id="search-results" style="display: none;">
+        <div id="search-count" style="font-size:12px; color:#666; margin-bottom:10px;"></div>
+        <div id="results-list"></div>
+    </div>
+</div>
     </div>
 
     <div class="panel right-panel">
@@ -183,19 +190,36 @@
 
     function searchData() {
         const query = document.getElementById('searchInput').value.toLowerCase().trim();
+        const resultsList = document.getElementById('results-list');
+        const searchResultsDiv = document.getElementById('search-results'); // ส่วนที่คุมทั้งจำนวนและรายการ
+        
+        // --- เงื่อนไขที่เพิ่มเข้าไป: ถ้าว่างให้ซ่อนทันที ---
+        if (query === "") {
+            searchResultsDiv.style.display = 'none';
+            return;
+        }
+        // -------------------------------------------
+
         const results = masterData.filter(item => (item.linkname || "").toLowerCase().includes(query));
-        const list = document.getElementById('results-list');
+        
+        // แสดงส่วนผลลัพธ์
+        searchResultsDiv.style.display = 'block';
         document.getElementById('search-count').innerText = `พบทั้งหมด ${results.length} รายการ`;
         
-        list.innerHTML = results.map(item => `
+        if (results.length === 0) {
+            resultsList.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">ไม่พบข้อมูล</div>';
+            return;
+        }
+
+        resultsList.innerHTML = results.map(item => `
             <div style="padding:12px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
                 <div>
                     <div style="font-weight:bold; font-size:14px;">${item.linkname}</div>
-                    <div style="font-size:12px; color:#999;">${new Date(item.spkdate).toLocaleDateString('th-TH')}</div>
+                    <div style="font-size:12px; color:#999;">${formatThaiDisplay(item.spkdate)}</div>
                 </div>
                 <div style="display:flex; gap:5px;">
-                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" style="background:none; border:1px solid #ddd; padding:5px; border-radius:4px; cursor:pointer;"><i data-lucide="copy" style="width:14px;"></i></button>
-                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')" style="background:none; border:1px solid #ddd; padding:5px; border-radius:4px; cursor:pointer;"><i data-lucide="external-link" style="width:14px;"></i></button>
+                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" title="Copy"><i data-lucide="copy" style="width:14px;"></i></button>
+                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')" title="Open"><i data-lucide="external-link" style="width:14px;"></i></button>
                 </div>
             </div>
         `).join('');

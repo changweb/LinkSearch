@@ -15,42 +15,39 @@
         :root { --primary: #1a73e8; --bg: #f8f9fa; --border: #e0e0e0; }
         body { font-family: 'Sarabun', sans-serif; background: var(--bg); margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
         
-        /* Navbar */
         .navbar { background: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); height: 50px; }
         .nav-user { display: flex; align-items: center; gap: 15px; }
         .user-email { color: var(--primary); font-weight: bold; font-size: 14px; }
         .btn-logout { background: #fff; color: #d93025; border: 1px solid #f8d7da; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
         .btn-logout:hover { background: #fce8e6; }
 
-        /* Main Layout */
         .main-content { display: flex; flex: 1; overflow: hidden; }
         .panel { display: flex; flex-direction: column; padding: 20px; overflow-y: auto; }
-        
-        /* Left Side: Search */
         .left-panel { flex: 1; border-right: 2px solid var(--border); background: #fff; }
-        
-        /* Right Side: Logs */
         .right-panel { flex: 1.2; background: var(--bg); }
 
-        /* Component Styles */
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid var(--border); }
         h2 { margin: 0 0 15px 0; font-size: 18px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
         
-        input[type="text"], input[type="date"] { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        input[type="text"], input[type="date"], select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 13px; }
+        input[type="text"]:focus, select:focus { border-color: var(--primary); outline: none; }
+        
         .btn-group { display: flex; gap: 8px; margin-bottom: 15px; }
-        .btn { padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px; font-size: 13px; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-secondary { background: #e8f0fe; color: var(--primary); }
+        .btn-danger { background: #fce8e6; color: #d93025; }
 
-        /* Table & Lists */
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
         .rank-badge { background: #e8f0fe; color: var(--primary); padding: 2px 6px; border-radius: 4px; font-weight: bold; }
         .action-tag { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
 
-        /* Login Overlay */
         #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; align-items: center; justify-content: center; }
         .login-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; text-align: center; }
+        
+        /* Utility styles สำหรับชุด Filter */
+        .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
     </style>
 </head>
 <body>
@@ -59,8 +56,8 @@
     <div class="login-card">
         <i data-lucide="shield-check" style="width: 48px; height: 48px; color: var(--primary); margin-bottom: 15px;"></i>
         <h2>Admin Login</h2>
-        <input type="email" id="login-email" placeholder="Email" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:8px;">
-        <input type="password" id="login-pass" placeholder="Password" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px;">
+        <input type="email" id="login-email" placeholder="Email" style="width:100%; padding:10px; margin-bottom:10px;">
+        <input type="password" id="login-pass" placeholder="Password" style="width:100%; padding:10px; margin-bottom:15px;">
         <button class="btn btn-primary" onclick="login()" style="width:100%; justify-content:center;">เข้าสู่ระบบ</button>
     </div>
 </div>
@@ -77,10 +74,13 @@
     <div class="panel left-panel">
         <div class="card">
             <h2><i data-lucide="search"></i> ค้นหาข้อมูล</h2>
-            <input type="text" id="searchInput" placeholder="พิมพ์ชื่อเรื่องที่ต้องการค้นหา..." oninput="searchData()">
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <input type="text" id="searchInput" placeholder="พิมพ์ชื่อเรื่องที่ต้องการค้นหา..." oninput="searchData()" style="flex:1; margin-bottom:0;">
+                <button class="btn btn-danger" onclick="clearSearch()" title="ล้างการค้นหา"><i data-lucide="x" style="width:16px;"></i> ล้าง</button>
+            </div>
             <div class="btn-group">
                 <button class="btn btn-secondary" id="sortBtn" onclick="toggleSort()">
-                    <i data-lucide="arrow-down-narrow-wide"></i> <span id="sortText">เรียงจาก: ใหม่ไปเก่า</span>
+                    <i data-lucide="arrow-down-narrow-wide" style="width:16px;"></i> <span id="sortText">เรียง: ใหม่ไปเก่า</span>
                 </button>
             </div>
         </div>
@@ -95,7 +95,7 @@
         <div class="card">
             <h2><i data-lucide="bar-chart-3"></i> รายงานการใช้งาน</h2>
             <div style="display:flex; gap:10px; align-items:center;">
-                <input type="date" id="dateFilter" onchange="loadLogs()" style="margin-bottom:0; width:auto; padding:6px 10px; font-size:14px; cursor:pointer;">
+                <input type="date" id="dateFilter" onchange="loadLogs()" style="margin-bottom:0; width:auto; cursor:pointer;">
                 <div style="text-align:right; flex:1">
                     <span style="font-size:13px; color:#666">ยอดกดลิงก์ของวันที่เลือก:</span>
                     <span id="today-count" style="font-size:24px; font-weight:bold; color:var(--primary); margin-left:8px;">0</span>
@@ -104,8 +104,14 @@
         </div>
 
         <div class="card" style="padding:0; overflow:hidden;">
-            <div style="padding:15px; background:#f8f9fa; font-weight:bold; font-size:14px; border-bottom:1px solid #ddd;">
-                🔥 ไฟล์ยอดนิยม (ตามวันที่เลือก)
+            <div style="padding:15px; background:#f8f9fa; font-weight:bold; font-size:14px; border-bottom:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;">
+                <span>🔥 ไฟล์ยอดนิยม (ตามวันที่เลือก)</span>
+                <select id="topLimit" onchange="renderLogsUI()">
+                    <option value="5">5 อันดับ</option>
+                    <option value="10">10 อันดับ</option>
+                    <option value="15">15 อันดับ</option>
+                    <option value="20">20 อันดับ</option>
+                </select>
             </div>
             <table id="top-table">
                 <thead><tr><th width="40">#</th><th>ชื่อไฟล์ / หัวข้อ</th><th width="80" style="text-align:center;">จำนวนครั้ง</th></tr></thead>
@@ -114,11 +120,29 @@
         </div>
 
         <div class="card" style="padding:0; overflow:hidden;">
-            <div style="padding:15px; background:#f8f9fa; font-weight:bold; font-size:14px; border-bottom:1px solid #ddd;">
-                🕒 ประวัติล่าสุด
+            <div style="padding:15px; background:#f8f9fa; border-bottom:1px solid #ddd;">
+                <div style="font-weight:bold; font-size:14px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>🕒 ประวัติล่าสุด</span>
+                    <select id="logLimit" onchange="renderLogsUI()">
+                        <option value="20">20 รายการ</option>
+                        <option value="50">50 รายการ</option>
+                        <option value="all">ทั้งหมด</option>
+                    </select>
+                </div>
+                
+                <div class="filter-row">
+                    <select id="userFilter" onchange="renderLogsUI()" style="flex:1;">
+                        <option value="all">-- ผู้ใช้งานทุกคน --</option>
+                    </select>
+                    <div style="display:flex; flex:2; gap:5px;">
+                        <input type="text" id="logSearchInput" placeholder="ค้นหาไฟล์ในประวัติ..." oninput="renderLogsUI()" style="margin-bottom:0; width:100%;">
+                        <button class="btn btn-danger" onclick="clearLogSearch()" style="padding:8px;" title="ล้าง"><i data-lucide="x" style="width:14px;"></i></button>
+                    </div>
+                </div>
             </div>
+            
             <table id="log-table">
-                <thead><tr><th>เวลา</th><th>ผู้ใช้งาน</th><th>ไฟล์</th><th>การกระทำ</th></tr></thead>
+                <thead><tr><th>เวลา</th><th>ผู้ใช้งาน</th><th>ไฟล์</th><th>Action</th></tr></thead>
                 <tbody id="log-body"></tbody>
             </table>
         </div>
@@ -142,8 +166,8 @@
 
     let masterData = [];
     let isNewestFirst = true;
+    let dailyLogs = []; // เก็บประวัติของวันที่เลือกไว้ประมวลผล
 
-    // ระบบ Login
     auth.onAuthStateChanged(user => {
         if (user) {
             document.getElementById('login-overlay').style.display = 'none';
@@ -155,16 +179,10 @@
         }
     });
 
-    // ฟังก์ชันแปลงวันที่แบบไทย
     function formatThaiDisplay(isoString) {
         if (!isoString) return '-';
-        try {
-            const date = new Date(isoString);
-            return date.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' });
-        } catch (e) { return isoString; }
+        try { return new Date(isoString).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' }); } catch (e) { return isoString; }
     }
-
-    // ฟังก์ชันเปรียบเทียบวันที่สำหรับการจัดเรียง
     function parseThaiDate(dateStr) {
         if (!dateStr) return 0;
         try {
@@ -178,7 +196,7 @@
         db.ref('MixLinks').on('value', snap => {
             masterData = Object.values(snap.val() || {}).filter(i => i !== null);
             sortMasterData();
-            searchData(); // โหลดครั้งแรกจะเข้าเงื่อนไข "ว่างเปล่า" และซ่อนผลลัพธ์
+            searchData();
         });
         loadLogs();
     }
@@ -194,8 +212,13 @@
 
     function toggleSort() {
         isNewestFirst = !isNewestFirst;
-        document.getElementById('sortText').innerText = isNewestFirst ? "เรียงจาก: ใหม่ไปเก่า" : "เรียงจาก: เก่าไปใหม่";
+        document.getElementById('sortText').innerText = isNewestFirst ? "เรียง: ใหม่ไปเก่า" : "เรียง: เก่าไปใหม่";
         sortMasterData();
+        searchData();
+    }
+
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
         searchData();
     }
 
@@ -204,19 +227,14 @@
         const searchResultsDiv = document.getElementById('search-results');
         const resultsList = document.getElementById('results-list');
         
-        // กฎเหล็ก: ถ้าช่องค้นหาว่าง ให้ปิดการแสดงผลทันที
         if (query === "") {
             searchResultsDiv.style.display = 'none';
             return;
         }
 
         const terms = query.split(' ').filter(t => t !== '');
-        const results = masterData.filter(item => {
-            const name = (item.linkname || "").toLowerCase();
-            return terms.every(term => name.includes(term));
-        });
+        const results = masterData.filter(item => terms.every(term => (item.linkname || "").toLowerCase().includes(term)));
         
-        // เปิดการแสดงผล และโชว์ตัวเลข
         searchResultsDiv.style.display = 'block';
         document.getElementById('search-count').innerText = `พบทั้งหมด ${results.length} รายการ`;
         
@@ -226,20 +244,16 @@
         }
 
         resultsList.innerHTML = results.map(item => `
-            <div style="background: #fff; padding: 15px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+            <div style="background: #fff; padding: 15px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <div style="font-weight: bold; font-size: 15px; color: #202124; margin-bottom: 4px;">${item.linkname}</div>
-                    <div style="font-size: 13px; color: #70757a; display: flex; align-items: center; gap: 4px;">
+                    <div style="font-weight: bold; font-size: 14px; color: #202124; margin-bottom: 4px;">${item.linkname}</div>
+                    <div style="font-size: 12px; color: #70757a; display: flex; align-items: center; gap: 4px;">
                         <i data-lucide="calendar" style="width:14px;"></i> ${formatThaiDisplay(item.spkdate)}
                     </div>
                 </div>
                 <div style="display: flex; gap: 8px;">
-                    <button onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" style="background:#fff; border:1px solid #dadce0; padding:8px; border-radius:6px; cursor:pointer; color:#5f6368;" title="Copy">
-                        <i data-lucide="copy" style="width:16px;"></i>
-                    </button>
-                    <button onclick="handleAction('${item.linkname}', '${item.link}', 'open')" style="background:#fff; border:1px solid #dadce0; padding:8px; border-radius:6px; cursor:pointer; color:#5f6368;" title="Open">
-                        <i data-lucide="external-link" style="width:16px;"></i>
-                    </button>
+                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')" style="background:#fff; border:1px solid #ddd; padding:6px; border-radius:6px; cursor:pointer;" title="Copy"><i data-lucide="copy" style="width:14px;"></i></button>
+                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')" style="background:#fff; border:1px solid #ddd; padding:6px; border-radius:6px; cursor:pointer;" title="Open"><i data-lucide="external-link" style="width:14px;"></i></button>
                 </div>
             </div>
         `).join('');
@@ -251,58 +265,97 @@
         const targetDate = document.getElementById('dateFilter').value;
         db.ref('logs').on('value', snap => {
             const logs = Object.values(snap.val() || {});
-            const filtered = logs.filter(l => new Date(l.timestamp).toISOString().split('T')[0] === targetDate);
             
-            document.getElementById('today-count').innerText = filtered.length;
+            // เก็บข้อมูลเฉพาะวันที่เลือกลงในตัวแปร global
+            dailyLogs = logs.filter(l => new Date(l.timestamp).toISOString().split('T')[0] === targetDate);
+            document.getElementById('today-count').innerText = dailyLogs.length;
 
-            // อันดับยอดนิยม
-            const freq = {};
-            filtered.forEach(l => freq[l.linkname] = (freq[l.linkname] || 0) + 1);
-            const sorted = Object.keys(freq).map(k => ({n:k, c:freq[k]})).sort((a,b)=>b.c-a.c).slice(0,5);
+            // อัปเดตรายชื่อผู้ใช้ใน Dropdown ให้มีเฉพาะคนที่ล็อคอินในวันนี้
+            const users = [...new Set(dailyLogs.map(l => l.user))].sort();
+            const userSelect = document.getElementById('userFilter');
+            const currentUser = userSelect.value; // จำค่าเดิมไว้
             
-            const topBody = document.getElementById('top-body');
-            if(sorted.length === 0) {
-                topBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888;">ไม่มีข้อมูลการใช้งานในวันนี้</td></tr>';
-            } else {
-                topBody.innerHTML = sorted.map((item, i) => `
-                    <tr><td><span class="rank-badge">${i+1}</span></td><td>${item.n}</td><td style="text-align:center; font-size:14px;"><b>${item.c}</b></td></tr>
-                `).join('');
-            }
+            userSelect.innerHTML = '<option value="all">-- ผู้ใช้งานทุกคน --</option>' + 
+                users.map(u => `<option value="${u}">${u.split('@')[0]}</option>`).join('');
+            
+            if(users.includes(currentUser)) userSelect.value = currentUser; // คงค่าเดิมไว้ถ้ามี
 
-            // ประวัติล่าสุด (20 อันดับ)
-            const recent = filtered.reverse().slice(0, 20);
-            document.getElementById('log-body').innerHTML = recent.map(l => `
-                <tr>
-                    <td style="color:#70757a; font-size:12px;">${new Date(l.timestamp).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})} น.</td>
-                    <td>${l.user.split('@')[0]}</td>
-                    <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${l.linkname}</td>
-                    <td><span class="action-tag" style="background:${l.action==='copy'?'#e8f0fe':'#e6f4ea'}; color:${l.action==='copy'?'#1a73e8':'#1e8e3e'}">${l.action}</span></td>
-                </tr>
-            `).join('');
+            renderLogsUI(); // เรียกฟังก์ชันอัปเดตหน้าจอ
         });
     }
 
-    // Actions การเปิดลิงก์และบันทึก Log
-    function handleAction(name, url, type) {
-        db.ref('logs').push({ 
-            user: auth.currentUser.email, 
-            linkname: name, 
-            action: type, 
-            timestamp: new Date().toISOString() 
-        });
-        if (type === 'copy') { 
-            navigator.clipboard.writeText(url).then(() => alert('คัดลอกลิงก์เรียบร้อยแล้ว!')); 
-        } else { 
-            window.open(url, '_blank'); 
+    function clearLogSearch() {
+        document.getElementById('logSearchInput').value = '';
+        renderLogsUI();
+    }
+
+    // ฟังก์ชันนี้รับหน้าที่ "กรองและแสดงผล" ตาม Dropdown ที่เลือก
+    function renderLogsUI() {
+        // 1. จัดการตารางยอดนิยม (Top Files)
+        const topLimit = parseInt(document.getElementById('topLimit').value);
+        const freq = {};
+        dailyLogs.forEach(l => freq[l.linkname] = (freq[l.linkname] || 0) + 1);
+        const sortedTop = Object.keys(freq).map(k => ({n:k, c:freq[k]})).sort((a,b)=>b.c-a.c).slice(0, topLimit);
+        
+        const topBody = document.getElementById('top-body');
+        if(sortedTop.length === 0) {
+            topBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888;">ไม่มีข้อมูลในวันนี้</td></tr>';
+        } else {
+            topBody.innerHTML = sortedTop.map((item, i) => `
+                <tr><td><span class="rank-badge">${i+1}</span></td><td>${item.n}</td><td style="text-align:center; font-size:14px;"><b>${item.c}</b></td></tr>
+            `).join('');
         }
+
+        // 2. จัดการตารางประวัติล่าสุด (Recent Logs)
+        const userFilter = document.getElementById('userFilter').value;
+        const searchInput = document.getElementById('logSearchInput').value.toLowerCase().trim();
+        const logLimit = document.getElementById('logLimit').value;
+
+        // คัดลอกและกลับด้านให้ใหม่ล่าสุดอยู่บน
+        let filteredLogs = [...dailyLogs].reverse(); 
+
+        // กรองตามผู้ใช้
+        if (userFilter !== 'all') {
+            filteredLogs = filteredLogs.filter(l => l.user === userFilter);
+        }
+
+        // กรองตามคำค้นหา
+        if (searchInput !== '') {
+            filteredLogs = filteredLogs.filter(l => (l.linkname || '').toLowerCase().includes(searchInput));
+        }
+
+        // ตัดจำนวนตาม Limit
+        if (logLimit !== 'all') {
+            filteredLogs = filteredLogs.slice(0, parseInt(logLimit));
+        }
+
+        const logBody = document.getElementById('log-body');
+        if(filteredLogs.length === 0) {
+            logBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888;">ไม่พบข้อมูลตามเงื่อนไขที่เลือก</td></tr>';
+        } else {
+            logBody.innerHTML = filteredLogs.map(l => `
+                <tr>
+                    <td style="color:#70757a; font-size:12px;">${new Date(l.timestamp).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})} น.</td>
+                    <td>${l.user.split('@')[0]}</td>
+                    <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${l.linkname}">${l.linkname}</td>
+                    <td><span class="action-tag" style="background:${l.action==='copy'?'#e8f0fe':'#e6f4ea'}; color:${l.action==='copy'?'#1a73e8':'#1e8e3e'}">${l.action}</span></td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    // Actions
+    function handleAction(name, url, type) {
+        db.ref('logs').push({ user: auth.currentUser.email, linkname: name, action: type, timestamp: new Date().toISOString() });
+        if (type === 'copy') { navigator.clipboard.writeText(url).then(() => alert('คัดลอกเรียบร้อยแล้ว!')); } 
+        else { window.open(url, '_blank'); }
     }
 
     function login() {
         const e = document.getElementById('login-email').value;
         const p = document.getElementById('login-pass').value;
-        auth.signInWithEmailAndPassword(e, p).catch(err => alert("อีเมลหรือรหัสผ่านไม่ถูกต้อง โปรดลองอีกครั้ง"));
+        auth.signInWithEmailAndPassword(e, p).catch(err => alert("ลองใหม่อีกครั้ง: " + err.message));
     }
-
     function logout() { auth.signOut(); }
 </script>
 </body>

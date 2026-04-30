@@ -63,6 +63,10 @@
 
         #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; align-items: center; justify-content: center; }
         .login-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; text-align: center; }
+        
+        /* Stats Box */
+        .stats-container { display: flex; justify-content: flex-end; gap: 20px; flex: 1; flex-wrap: wrap; }
+        .stat-item { display: flex; align-items: center; background: #f8f9fa; padding: 4px 12px; border-radius: 8px; border: 1px solid #eee; }
     </style>
 </head>
 <body>
@@ -86,6 +90,7 @@
 </nav>
 
 <div class="main-content">
+    <!-- ฝั่งซ้าย: ระบบค้นหา -->
     <div class="panel left-panel">
         <div class="card">
             <h2><i data-lucide="search"></i> ค้นหาข้อมูล</h2>
@@ -98,21 +103,34 @@
             </button>
         </div>
         
+        <!-- ส่วนแสดงผลการค้นหา -->
         <div id="search-results">
             <div id="search-count" style="font-size:13px; color:#666; font-weight:bold; border-left: 3px solid var(--primary); padding-left: 8px; flex-shrink: 0;"></div>
             <div id="results-list"></div>
         </div>
     </div>
 
+    <!-- ฝั่งขวา: ระบบ Logs & Analytics -->
     <div class="panel right-panel">
-        <div class="card" style="display:flex; gap:10px; align-items:center;">
-            <input type="date" id="dateFilter" onchange="loadLogs()" style="margin-bottom:0; width:auto; cursor:pointer;">
-            <div style="text-align:right; flex:1">
-                <span style="font-size:13px; color:#666">ยอดกดลิงก์ (วันที่เลือก):</span>
-                <span id="today-count" style="font-size:20px; font-weight:bold; color:var(--primary); margin-left:8px;">0</span>
+        <div class="card" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <i data-lucide="calendar" style="color:var(--primary); width:18px;"></i>
+                <input type="date" id="dateFilter" onchange="loadLogs()" style="margin-bottom:0; width:auto; cursor:pointer; font-weight:bold;">
+            </div>
+            
+            <div class="stats-container">
+                <div class="stat-item">
+                    <span style="font-size:13px; color:#666">จำนวนไฟล์ที่ถูกกด:</span>
+                    <span id="unique-file-count" style="font-size:20px; font-weight:bold; color:#34a853; margin-left:8px;">0</span>
+                </div>
+                <div class="stat-item" style="background:#e8f0fe; border-color:#d2e3fc;">
+                    <span style="font-size:13px; color:#1a73e8">ยอดกดรวม:</span>
+                    <span id="today-count" style="font-size:20px; font-weight:bold; color:var(--primary); margin-left:8px;">0</span>
+                </div>
             </div>
         </div>
 
+        <!-- ตารางยอดนิยม -->
         <div class="card table-card" style="flex: 1; max-height: 35vh;">
             <div class="card-header">
                 <span style="color:#d93025"><i data-lucide="flame" style="width:14px; vertical-align:middle;"></i> ไฟล์ยอดนิยม</span>
@@ -131,6 +149,7 @@
             </div>
         </div>
 
+        <!-- ตารางประวัติล่าสุด -->
         <div class="card table-card" style="flex: 1.5;">
             <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
                 <div style="display:flex; align-items:center; gap:5px; width:100%; justify-content:space-between;">
@@ -141,12 +160,13 @@
                         <option value="all">ทั้งหมด</option>
                     </select>
                 </div>
+                <!-- ชุดตัวกรอง -->
                 <div style="display:flex; gap:8px; width:100%;">
                     <select id="userFilter" onchange="renderLogsUI()" style="flex:1;">
                         <option value="all">-- ผู้ใช้ทุกคน --</option>
                     </select>
                     <div style="display:flex; flex:2; gap:5px;">
-                        <input type="text" id="logSearchInput" placeholder="ค้นหาไฟล์..." oninput="renderLogsUI()" style="width:100%; margin-bottom:0;">
+                        <input type="text" id="logSearchInput" placeholder="ค้นหาประวัติไฟล์..." oninput="renderLogsUI()" style="width:100%; margin-bottom:0;">
                         <button class="btn btn-danger" onclick="clearLogSearch()" style="padding:6px 10px;" title="ล้าง"><i data-lucide="x" style="width:14px;"></i></button>
                     </div>
                 </div>
@@ -239,14 +259,14 @@
         const resultsList = document.getElementById('results-list');
         
         if (query === "") {
-            searchResultsDiv.style.display = 'none'; // ซ่อนเมื่อว่าง
+            searchResultsDiv.style.display = 'none';
             return;
         }
 
         const terms = query.split(' ').filter(t => t !== '');
         const results = masterData.filter(item => terms.every(term => (item.linkname || "").toLowerCase().includes(term)));
         
-        searchResultsDiv.style.display = 'flex'; // แสดงเป็น flex เพื่อให้ scroll ทำงาน
+        searchResultsDiv.style.display = 'flex';
         document.getElementById('search-count').innerText = `พบทั้งหมด ${results.length} รายการ`;
         
         if (results.length === 0) {
@@ -276,8 +296,15 @@
         db.ref('logs').on('value', snap => {
             const logs = Object.values(snap.val() || {});
             dailyLogs = logs.filter(l => new Date(l.timestamp).toISOString().split('T')[0] === targetDate);
+            
+            // 1. อัปเดตยอดกดรวม
             document.getElementById('today-count').innerText = dailyLogs.length;
 
+            // 2. คำนวณยอดไฟล์ที่ไม่ซ้ำ (Unique Files)
+            const uniqueFiles = new Set(dailyLogs.map(l => l.linkname));
+            document.getElementById('unique-file-count').innerText = uniqueFiles.size;
+
+            // 3. จัดการรายชื่อผู้ใช้
             const users = [...new Set(dailyLogs.map(l => l.user))].sort();
             const userSelect = document.getElementById('userFilter');
             const currentUser = userSelect.value; 

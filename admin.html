@@ -364,9 +364,23 @@
     }
 
     function handleAction(name, url, type) {
+        // 1. บันทึกประวัติลง Logs
         db.ref('logs').push({ user: auth.currentUser.email, linkname: name, action: type, timestamp: new Date().toISOString() });
-        if (type === 'copy') { navigator.clipboard.writeText(url).then(() => alert('คัดลอกเรียบร้อยแล้ว!')); } 
-        else { window.open(url, '_blank'); }
+        
+        // 2. ถ้าเป็นการกดปุ่ม Copy
+        if (type === 'copy') { 
+            // ประกอบร่างข้อความ: ชื่อเรื่อง + ขึ้นบรรทัดใหม่ (\n) + ลิงก์
+            const textToCopy = name + "\n" + url;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                // เปลี่ยนข้อความแจ้งเตือนนิดหน่อยให้รู้ว่าก็อปไปทั้งคู่แล้ว
+                alert('คัดลอก "ชื่อและลิงก์" เรียบร้อยแล้ว!\n\n' + name); 
+            }); 
+        } 
+        // 3. ถ้าเป็นการกดปุ่ม Open
+        else { 
+            window.open(url, '_blank'); 
+        }
     }
 
     function login() {

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MixLinks - Log Cleaner</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --primary: #1a73e8; --bg: #f4f7f9; --border: #e0e0e0; --danger: #d93025; --warning: #f9ab00; }
+        body { font-family: 'Sarabun', sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+
+        .navbar { background: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+        .nav-user { display: flex; align-items: center; gap: 15px; }
+        
+        .container { max-width: 1000px; margin: 20px auto; padding: 0 15px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 20px; }
+        
+        h2 { margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+        
+        input, select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 14px; }
+        .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; font-size: 14px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-warning { background: #fef7e0; color: #b06000; border: 1px solid #f9ab00; }
+        .btn-outline { background: white; border: 1px solid #ddd; color: #555; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: bold; }
+        .action-tag { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+
+        .badge-count { background: var(--danger); color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+        
+        #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: white; padding: 40px; border-radius: 15px; width: 350px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay">
+    <div class="login-card">
+        <i data-lucide="shield-alert" style="width: 48px; height: 48px; color: var(--danger); margin-bottom: 15px;"></i>
+        <h2>Admin (Log Cleaner)</h2>
+        <input type="email" id="login-email" placeholder="Email" style="width:100%; box-sizing:border-box; margin-bottom:10px;">
+        <input type="password" id="login-pass" placeholder="Password" style="width:100%; box-sizing:border-box; margin-bottom:15px;">
+        <button class="btn btn-danger" onclick="login()" style="width:100%; justify-content:center;">เข้าสู่ระบบทำความสะอาด</button>
+    </div>
+</div>
+
+<nav class="navbar">
+    <div style="font-weight: bold; color: var(--danger); font-size: 18px;">
+        <i data-lucide="trash-2" style="vertical-align: middle;"></i> MixLinks Log Cleaner
+    </div>
+    <div class="nav-user">
+        <a href="admin.html" style="text-decoration:none; color:var(--primary); font-size:14px; font-weight:bold;">กลับหน้า Admin หลัก</a>
+        <span id="display-user" style="font-size:14px; color:#555;"></span>
+    </div>
+</nav>
+
+<div class="container">
+    <!-- ส่วนที่ 1: สแกนข้อมูลซ้ำ -->
+    <div class="card" style="border-top: 4px solid var(--warning);">
+        <h2 style="color: #b06000;"><i data-lucide="scan-search"></i> ระบบสแกนหาข้อมูลกดซ้ำ (Auto-Scan)</h2>
+        <div style="display: flex; gap: 10px; align-items: center; background: #fef7e0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <span>ถือว่า "ซ้ำ" เมื่อผู้ใช้คนเดิม กดลิงก์เดิม ห่างกันไม่เกิน:</span>
+            <input type="number" id="timeThreshold" value="5" min="1" max="60" style="width: 60px; text-align: center;">
+            <span>นาที</span>
+            <button class="btn btn-warning" onclick="scanDuplicates()">
+                <i data-lucide="search"></i> สแกนหาข้อมูลขยะ
+            </button>
+        </div>
+
+        <div id="dup-results-area" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-weight: bold; color: var(--danger);">
+                    พบข้อมูลเข้าข่ายกดซ้ำ: <span id="dup-count" class="badge-count">0</span> รายการ
+                </span>
+                <button class="btn btn-danger" id="btn-delete-all-dups" onclick="deleteAllDuplicates()" style="display:none;">
+                    <i data-lucide="trash"></i> ลบข้อมูลที่ซ้ำทั้งหมดทันที
+                </button>
+            </div>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">
+                <table id="dup-table">
+                    <thead><tr><th>เวลา</th><th>ผู้ใช้งาน</th><th>ไฟล์ที่กดซ้ำ</th><th>การกระทำ</th></tr></thead>
+                    <tbody id="dup-body"></tbody>
+                </table>
+            </div>
+            <p style="font-size:12px; color:#666; margin-top:10px;">* ระบบจะเก็บการคลิกครั้งแรกไว้ และเลือกแสดงเฉพาะการคลิกครั้งถัดๆ ไปที่อยู่ในช่วงเวลาที่กำหนดเพื่อนำมาลบ</p>
+        </div>
+    </div>
+
+    <!-- ส่วนที่ 2: ลบข้อมูลแบบ Manual -->
+    <div class="card" style="border-top: 4px solid var(--danger);">
+        <h2 style="color: var(--danger);"><i data-lucide="list-x"></i> จัดการ Logs ด้วยตัวเอง (Manual Delete)</h2>
+        
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            <input type="date" id="dateFilter" onchange="renderManualLogs()">
+            <select id="userFilter" onchange="renderManualLogs()" style="flex: 1;">
+                <option value="all">-- ผู้ใช้ทุกคน --</option>
+            </select>
+            <input type="text" id="searchFilter" placeholder="ค้นหาชื่อไฟล์..." oninput="renderManualLogs()" style="flex: 1;">
+        </div>
+
+        <div style="max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">
+            <table id="manual-table">
+                <thead><tr><th>เวลา</th><th>ผู้ใช้งาน</th><th>ไฟล์</th><th>Action</th><th width="50" style="text-align:center;">ลบ</th></tr></thead>
+                <tbody id="manual-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCN3DS1X6pRi6LxckAitWHmLmsnx5WF7XA",
+        authDomain: "linksearch-84695.firebaseapp.com",
+        databaseURL: "https://linksearch-84695-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "linksearch-84695",
+        storageBucket: "linksearch-84695.appspot.com",
+        messagingSenderId: "886580157297",
+        appId: "1:886580157297:web:2d843a0f7db6948f9f74d0"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    let allLogsWithIDs = []; 
+    let duplicateIdsToDelete = []; // เก็บ ID ที่เข้าข่ายว่าซ้ำ
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('display-user').innerText = user.email;
+            document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
+            fetchAllLogs();
+        } else {
+            document.getElementById('login-overlay').style.display = 'flex';
+        }
+    });
+
+    // ดึงข้อมูล Logs ทั้งหมดพร้อมกับ Key (ID) ของ Firebase เพื่อให้ใช้ลบได้
+    function fetchAllLogs() {
+        db.ref('logs').on('value', snap => {
+            const data = snap.val() || {};
+            // แปลง Object ให้เป็น Array โดยพ่วง ID เข้าไปด้วย
+            allLogsWithIDs = Object.keys(data).map(key => ({
+                id: key,
+                ...data[key]
+            }));
+            
+            updateUserDropdown();
+            renderManualLogs();
+            document.getElementById('dup-results-area').style.display = 'none'; // ซ่อนตารางสแกนไว้ก่อน
+        });
+    }
+
+    function updateUserDropdown() {
+        const users = [...new Set(allLogsWithIDs.map(l => l.user))].sort();
+        const userSelect = document.getElementById('userFilter');
+        const currentVal = userSelect.value;
+        userSelect.innerHTML = '<option value="all">-- ผู้ใช้ทุกคน --</option>' + users.map(u => `<option value="${u}">${u.split('@')[0]}</option>`).join('');
+        if(users.includes(currentVal)) userSelect.value = currentVal;
+    }
+
+    // --- ระบบที่ 1: สแกนหาข้อมูลซ้ำ (Auto-Scan) ---
+    function scanDuplicates() {
+        const thresholdMinutes = parseInt(document.getElementById('timeThreshold').value) || 5;
+        const thresholdMs = thresholdMinutes * 60 * 1000;
+        
+        duplicateIdsToDelete = [];
+        let duplicatesToDisplay = [];
+
+        // 1. เรียงข้อมูลตามเวลาจากเก่าไปใหม่
+        let sortedLogs = [...allLogsWithIDs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        // 2. จัดกลุ่มตาม ผู้ใช้ + ชื่อไฟล์ + Action
+        let groups = {};
+        sortedLogs.forEach(log => {
+            let key = `${log.user}_${log.linkname}_${log.action}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(log);
+        });
+
+        // 3. หาข้อมูลที่กดใกล้กันเกินไป
+        for (let key in groups) {
+            let items = groups[key];
+            if (items.length < 2) continue; // มีแค่คลิกเดียว ข้ามไป
+
+            let anchorValidLog = items[0]; // ยึดการคลิกครั้งแรกเป็นหลัก
+            
+            for (let i = 1; i < items.length; i++) {
+                let currentLog = items[i];
+                let diffTime = new Date(currentLog.timestamp) - new Date(anchorValidLog.timestamp);
+                
+                if (diffTime <= thresholdMs) {
+                    // ถ้าห่างกันไม่เกินเวลาที่กำหนด ถือว่าซ้ำ
+                    duplicateIdsToDelete.push(currentLog.id);
+                    duplicatesToDisplay.push(currentLog);
+                } else {
+                    // ถ้าห่างกันมากพอ ถือว่าเป็นการคลิกใหม่ที่ตั้งใจ ให้ยึดเป็นหลักอันใหม่
+                    anchorValidLog = currentLog;
+                }
+            }
+        }
+
+        // แสดงผล
+        document.getElementById('dup-results-area').style.display = 'block';
+        document.getElementById('dup-count').innerText = duplicatesToDisplay.length;
+        
+        const dupBody = document.getElementById('dup-body');
+        const btnDeleteAll = document.getElementById('btn-delete-all-dups');
+
+        if (duplicatesToDisplay.length === 0) {
+            dupBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#34a853; font-weight:bold; padding:20px;">🎉 ยอดเยี่ยม! ไม่พบข้อมูลกดซ้ำซ้อนในช่วงเวลาดังกล่าว</td></tr>';
+            btnDeleteAll.style.display = 'none';
+        } else {
+            // เรียงให้ของใหม่สุดอยู่บนก่อนแสดงผล
+            duplicatesToDisplay.reverse();
+            dupBody.innerHTML = duplicatesToDisplay.map(l => `
+                <tr style="background: #fffafa;">
+                    <td style="color:#d93025; font-size:12px;">${new Date(l.timestamp).toLocaleString('th-TH')}</td>
+                    <td>${l.user.split('@')[0]}</td>
+                    <td>${l.linkname}</td>
+                    <td><span class="action-tag" style="background:#fce8e6; color:#d93025;">${l.action} (ซ้ำ)</span></td>
+                </tr>
+            `).join('');
+            btnDeleteAll.style.display = 'inline-flex';
+        }
+        lucide.createIcons();
+    }
+
+    function deleteAllDuplicates() {
+        if (duplicateIdsToDelete.length === 0) return;
+        
+        if (confirm(`⚠️ ยืนยันการลบข้อมูลขยะจำนวน ${duplicateIdsToDelete.length} รายการ?\n\nการกระทำนี้ไม่สามารถย้อนกลับได้`)) {
+            let updates = {};
+            // กำหนดให้ ID เหล่านี้มีค่าเป็น null (คำสั่งลบของ Firebase)
+            duplicateIdsToDelete.forEach(id => {
+                updates[id] = null;
+            });
+
+            db.ref('logs').update(updates).then(() => {
+                alert('✅ ลบข้อมูลที่ซ้ำซ้อนสำเร็จแล้ว!');
+                document.getElementById('dup-results-area').style.display = 'none';
+            }).catch(err => {
+                alert('เกิดข้อผิดพลาด: ' + err.message);
+            });
+        }
+    }
+
+    // --- ระบบที่ 2: ลบข้อมูลด้วยตัวเอง (Manual) ---
+    function renderManualLogs() {
+        const dateFilter = document.getElementById('dateFilter').value;
+        const userFilter = document.getElementById('userFilter').value;
+        const searchFilter = document.getElementById('searchFilter').value.toLowerCase().trim();
+
+        let filtered = [...allLogsWithIDs].reverse(); // ใหม่ไปเก่า
+
+        // กรองวันที่
+        if (dateFilter) filtered = filtered.filter(l => new Date(l.timestamp).toISOString().split('T')[0] === dateFilter);
+        // กรองคน
+        if (userFilter !== 'all') filtered = filtered.filter(l => l.user === userFilter);
+        // กรองคำค้นหา
+        if (searchFilter) filtered = filtered.filter(l => (l.linkname || '').toLowerCase().includes(searchFilter));
+
+        const tbody = document.getElementById('manual-body');
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#888;">ไม่พบข้อมูล</td></tr>';
+        } else {
+            tbody.innerHTML = filtered.map(l => `
+                <tr>
+                    <td style="color:#70757a; font-size:12px;">${new Date(l.timestamp).toLocaleTimeString('th-TH')} น.</td>
+                    <td>${l.user.split('@')[0]}</td>
+                    <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${l.linkname}</td>
+                    <td><span class="action-tag" style="background:${l.action==='copy'?'#e8f0fe':'#e6f4ea'}; color:${l.action==='copy'?'#1a73e8':'#1e8e3e'}">${l.action}</span></td>
+                    <td style="text-align:center;">
+                        <button class="btn btn-outline" onclick="deleteSingleLog('${l.id}')" style="padding:4px 8px;" title="ลบรายการนี้">
+                            <i data-lucide="trash" style="width:14px; color:var(--danger);"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        lucide.createIcons();
+    }
+
+    function deleteSingleLog(logId) {
+        if (confirm('คุณต้องการลบประวัติการคลิกรายการนี้ใช่หรือไม่?')) {
+            db.ref('logs/' + logId).remove()
+                .catch(err => alert('ลบไม่สำเร็จ: ' + err.message));
+        }
+    }
+
+    function login() {
+        const e = document.getElementById('login-email').value;
+        const p = document.getElementById('login-pass').value;
+        auth.signInWithEmailAndPassword(e, p).catch(err => alert("ลองใหม่อีกครั้ง: " + err.message));
+    }
+    function logout() { auth.signOut(); }
+</script>
+</body>
+</html>

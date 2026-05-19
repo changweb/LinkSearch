@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบคัดลอกชื่อไฟล์สำหรับตัดต่อ</title>
     
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
 
@@ -14,7 +12,6 @@
         :root { --primary: #0f9d58; --bg: #f8f9fa; --border: #e0e0e0; }
         body { font-family: 'Sarabun', sans-serif; background: var(--bg); margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
         
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
@@ -49,12 +46,15 @@
         .no-data { text-align: center; color: #888; padding: 40px; font-size: 16px; }
         
         /* Loading Screen */
-        #loading { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; justify-content: center; align-items: center; font-size: 18px; color: #666; font-weight: bold; }
+        #loading { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 18px; color: #666; font-weight: bold; gap: 10px; }
     </style>
 </head>
 <body>
 
-<div id="loading">กำลังโหลดข้อมูลชื่อไฟล์...</div>
+<div id="loading">
+    <i data-lucide="loader-2" class="spin" style="width: 32px; height: 32px; color: var(--primary);"></i>
+    <span>กำลังโหลดข้อมูลชื่อไฟล์...</span>
+</div>
 
 <div class="header-panel">
     <div class="title-main"><i data-lucide="video" style="color:var(--primary)"></i> ระบบคัดลอกชื่อไฟล์ส่งงานตัดต่อ</div>
@@ -74,42 +74,48 @@
 </div>
 
 <script>
-    // การตั้งค่า Firebase เชื่อมต่อฐานข้อมูลเดิมของพี่
-    const firebaseConfig = {
-        databaseURL: "https://linksearch-84695-default-rtdb.asia-southeast1.firebasedatabase.app"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    // ดึงข้อมูลตรงผ่าน REST API JSON ป้องกันอาการค้างรอนาน
+    const secret = "AFZ2OqBiEJzlKKF8okPLi4mcj1VD4pa62EeWTndR";
+    const firebaseUrl = "https://linksearch-84695-default-rtdb.asia-southeast1.firebasedatabase.app/NamingBot.json?auth=" + secret;
 
     let masterItems = [];
 
-    // ดึงข้อมูลแบบ Realtime จากโหนด NamingBot
-    db.ref('NamingBot').on('value', snap => {
-        document.getElementById('loading').style.display = 'none';
-        const data = snap.val();
-        
-        if (!data) {
-            document.getElementById('data-list').innerHTML = '<div class="no-data">ไม่พบข้อมูลชื่อไฟล์ในระบบในขณะนี้</div>';
-            return;
-        }
+    // เริ่มทำงานดึงข้อมูลเมื่อโหลดหน้าเว็บ
+    window.onload = function() {
+        lucide.createIcons();
+        fetchData();
+    };
 
-        // แสดงวันที่ประชุม (ดึงค่า C2 ที่ได้บันทึกไว้)
-        document.getElementById('meeting-date-display').innerHTML = `<i data-lucide="calendar" style="width:14px;"></i> การประชุมวันที่: ${data.meetingDate || '-'}`;
+    function fetchData() {
+        fetch(firebaseUrl)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (!data) {
+                    document.getElementById('data-list').innerHTML = '<div class="no-data">ไม่พบข้อมูลชื่อไฟล์ในระบบในขณะนี้</div>';
+                    return;
+                }
 
-        masterItems = data.items || [];
-        
-        // สกัดสร้างตัวเลือกสำหรับ Dropdown คัดกรองวาระ
-        const uniqueAgendas = [...new Set(masterItems.map(item => item.agenda))].filter(a => a !== "");
-        const filterSelect = document.getElementById('agendaFilter');
-        const currentSelection = filterSelect.value;
+                // แสดงวันที่ประชุม (ค่าจาก C2)
+                document.getElementById('meeting-date-display').innerHTML = `<i data-lucide="calendar" style="width:14px;"></i> การประชุมวันที่: ${data.meetingDate || '-'}`;
 
-        filterSelect.innerHTML = '<option value="all">-- แสดงทุกวาระการประชุม --</option>' + 
-            uniqueAgendas.map(a => `<option value="${a}">${a}</option>`).join('');
-        
-        if(uniqueAgendas.includes(currentSelection)) filterSelect.value = currentSelection;
+                masterItems = data.items || [];
+                
+                // สร้างตัวเลือกสำหรับ Dropdown คัดกรองวาระ
+                const uniqueAgendas = [...new Set(masterItems.map(item => item.agenda))].filter(a => a !== "");
+                const filterSelect = document.getElementById('agendaFilter');
+                
+                filterSelect.innerHTML = '<option value="all">-- แสดงทุกวาระการประชุม --</option>' + 
+                    uniqueAgendas.map(a => `<option value="${a}">${a}</option>`).join('');
 
-        renderList(masterItems);
-    });
+                renderList(masterItems);
+            })
+            .catch(error => {
+                console.error("Error fetching data:", error);
+                document.getElementById('loading').innerHTML = '<span style="color:red;">⚠️ เกิดข้อผิดพลาด ไม่สามารถดึงข้อมูลจากฐานข้อมูลได้</span>';
+            });
+    }
 
     function renderList(items) {
         const container = document.getElementById('data-list');
@@ -124,7 +130,7 @@
                     <span class="agenda-text">${item.agenda}</span>
                     <div class="filename-text" id="name-${index}">${item.fileName}</div>
                 </div>
-                <button class="btn-copy" onclick="copyText('${item.fileName}', this)">
+                <button class="btn-copy" onclick="copyText('${item.fileName.replace(/'/g, "\\'")}', this)">
                     <i data-lucide="copy" style="width:16px;"></i> คัดลอกชื่อไฟล์
                 </button>
             </div>
@@ -144,7 +150,6 @@
 
     function copyText(text, buttonElement) {
         navigator.clipboard.writeText(text).then(() => {
-            // เปลี่ยนสถานะปุ่มชั่วคราวเพื่อให้คนตัดต่อรู้ว่าก็อปสำเร็จแล้ว
             const originalHTML = buttonElement.innerHTML;
             buttonElement.classList.add('copied');
             buttonElement.innerHTML = '<i data-lucide="check" style="width:16px;"></i> คัดลอกแล้ว!';
@@ -158,5 +163,14 @@
         });
     }
 </script>
+
+<style>
+    /* เพิ่มเอฟเฟกต์หมุนๆ ตอนกำลังโหลดให้สวยงาม */
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .spin { animation: spin 1s linear infinite; }
+</style>
 </body>
 </html>

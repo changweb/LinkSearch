@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบคัดลอกชื่อไฟล์สำหรับตัดต่อ</title>
+    <title>ระบบคัดลอกชื่อไฟล์สำหรับตัดต่อ (Real-time)</title>
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
@@ -21,8 +21,12 @@
         .title-main { font-size: 20px; font-weight: bold; color: #202124; margin: 0 0 5px 0; display: flex; align-items: center; gap: 10px; }
         .date-badge { font-size: 14px; color: #5f6368; display: inline-flex; align-items: center; gap: 5px; background: #e8f0fe; color: #1a73e8; padding: 4px 10px; border-radius: 20px; margin-bottom: 15px; font-weight: bold; }
         
+        /* Status Indicator */
+        .live-status { font-size: 12px; color: #0f9d58; display: inline-flex; align-items: center; gap: 4px; font-weight: bold; margin-left: auto; }
+        .pulse-dot { width: 8px; height: 8px; background: #0f9d58; border-radius: 50%; animation: pulse 1.5s infinite; }
+
         /* Controls */
-        .controls-row { display: flex; gap: 10px; align-items: center; }
+        .controls-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
         select { padding: 10px 15px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 14px; width: 100%; max-width: 400px; cursor: pointer; outline: none; background: white; }
         select:focus { border-color: var(--primary); }
 
@@ -47,13 +51,24 @@
         
         /* Loading Screen */
         #loading { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 18px; color: #666; font-weight: bold; gap: 10px; }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(15, 157, 88, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(15, 157, 88, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(15, 157, 88, 0); }
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spin { animation: spin 1s linear infinite; }
     </style>
 </head>
 <body>
 
 <div id="loading">
     <i data-lucide="loader-2" class="spin" style="width: 32px; height: 32px; color: var(--primary);"></i>
-    <span>กำลังโหลดข้อมูลชื่อไฟล์...</span>
+    <span>กำลังเชื่อมต่อระบบฐานข้อมูลเรียลไทม์...</span>
 </div>
 
 <div class="header-panel">
@@ -64,6 +79,10 @@
         <select id="agendaFilter" onchange="filterData()">
             <option value="all">-- แสดงทุกวาระการประชุม --</option>
         </select>
+        <div class="live-status">
+            <div class="pulse-dot"></div>
+            <span>ฐานข้อมูลเชื่อมต่อเรียลไทม์</span>
+        </div>
     </div>
 </div>
 
@@ -74,24 +93,27 @@
 </div>
 
 <script>
-    // ดึงข้อมูลตรงผ่าน REST API JSON ป้องกันอาการค้างรอนาน
     const secret = "AFZ2OqBiEJzlKKF8okPLi4mcj1VD4pa62EeWTndR";
+    // ใช้คำสั่ง Streaming (SSE) ของ Firebase ด้วยการส่งผ่าน Header `text/event-stream` ในระดับเบื้องหลัง
     const firebaseUrl = "https://linksearch-84695-default-rtdb.asia-southeast1.firebasedatabase.app/NamingBot.json?auth=" + secret;
 
     let masterItems = [];
 
-    // เริ่มทำงานดึงข้อมูลเมื่อโหลดหน้าเว็บ
     window.onload = function() {
         lucide.createIcons();
-        fetchData();
+        initRealtimeSync();
     };
 
-    function fetchData() {
-        fetch(firebaseUrl)
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('loading').style.display = 'none';
-                
+    // ใช้ EventSource เปิดท่อส่งข้อมูลเรียลไทม์กับ Firebase
+    function initRealtimeSync() {
+        const eventSource = new EventSource(firebaseUrl);
+
+        eventSource.addEventListener('put', function(e) {
+            document.getElementById('loading').style.display = 'none';
+            try {
+                const packet = JSON.parse(e.data);
+                const data = packet.data;
+
                 if (!data) {
                     document.getElementById('data-list').innerHTML = '<div class="no-data">ไม่พบข้อมูลชื่อไฟล์ในระบบในขณะนี้</div>';
                     return;
@@ -100,21 +122,34 @@
                 // แสดงวันที่ประชุม (ค่าจาก C2)
                 document.getElementById('meeting-date-display').innerHTML = `<i data-lucide="calendar" style="width:14px;"></i> การประชุมวันที่: ${data.meetingDate || '-'}`;
 
-                masterItems = data.items || [];
+                // นำข้อมูลมากลับด้าน (Reverse) เพื่อเรียงลำดับจาก ใหม่ไปเก่า
+                const rawItems = data.items || [];
+                masterItems = [...rawItems].reverse(); 
                 
-                // สร้างตัวเลือกสำหรับ Dropdown คัดกรองวาระ
-                const uniqueAgendas = [...new Set(masterItems.map(item => item.agenda))].filter(a => a !== "");
+                // อัปเดต Dropdown วาระการประชุม (คงค่าที่เลือกไว้ก่อนหน้าถ้ามี)
+                const uniqueAgendas = [...new Set(rawItems.map(item => item.agenda))].filter(a => a !== "");
                 const filterSelect = document.getElementById('agendaFilter');
+                const currentSelection = filterSelect.value;
                 
                 filterSelect.innerHTML = '<option value="all">-- แสดงทุกวาระการประชุม --</option>' + 
                     uniqueAgendas.map(a => `<option value="${a}">${a}</option>`).join('');
 
-                renderList(masterItems);
-            })
-            .catch(error => {
-                console.error("Error fetching data:", error);
-                document.getElementById('loading').innerHTML = '<span style="color:red;">⚠️ เกิดข้อผิดพลาด ไม่สามารถดึงข้อมูลจากฐานข้อมูลได้</span>';
-            });
+                if(uniqueAgendas.includes(currentSelection)) {
+                    filterSelect.value = currentSelection;
+                }
+
+                // ทำการแสดงผลรายชื่อ
+                filterData();
+
+            } catch (err) {
+                console.error("Error processing real-time stream:", err);
+            }
+        });
+
+        eventSource.onerror = function(err) {
+            console.error("EventSource failed:", err);
+            // กรณีระบบหลุด จะพยายามต่อสัญญาณให้ใหม่อัตโนมัติ
+        };
     }
 
     function renderList(items) {
@@ -163,14 +198,5 @@
         });
     }
 </script>
-
-<style>
-    /* เพิ่มเอฟเฟกต์หมุนๆ ตอนกำลังโหลดให้สวยงาม */
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    .spin { animation: spin 1s linear infinite; }
-</style>
 </body>
 </html>

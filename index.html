@@ -14,11 +14,10 @@
     <style>
         body { font-family: 'Sarabun', sans-serif; background: #f0f2f5; margin: 0; padding: 0; color: #333; }
         
-        /* Navigation Bar */
         .navbar { 
             background: white; 
             padding: 10px 20px; 
-            display: none; /* ซ่อนไว้ก่อน Login */
+            display: none; 
             justify-content: space-between; 
             align-items: center; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -53,7 +52,7 @@
         .date { font-size: 0.85em; color: #70757a; display: flex; align-items: center; gap: 4px; }
         
         .actions { display: flex; gap: 8px; }
-        .btn-icon { background: #fff; border: 1px solid #dadce0; padding: 8px; border-radius: 6px; cursor: pointer; color: #5f6368; }
+        .btn-icon { background: #fff; border: 1px solid #dadce0; padding: 8px; border-radius: 6px; cursor: pointer; color: #5f6368; transition: 0.2s; }
         .btn-icon:hover { background: #f1f3f4; color: #1a73e8; border-color: #1a73e8; }
         .icon { width: 16px; height: 16px; }
         .icon-sm { width: 14px; height: 14px; }
@@ -118,6 +117,7 @@
 
     let allData = [];
     let isNewestFirst = true;
+    let isActionBusy = false;
 
     window.onload = function() {
         firebase.initializeApp(firebaseConfig);
@@ -164,7 +164,8 @@
     }
 
     function loadData() {
-        window.db.ref('MixLinks').on('value', snapshot => {
+        // ดึงข้อมูลจากโหนด PublicSearch (หรือ MixLinks ตามที่ใช้งาน)
+        window.db.ref('PublicSearch').on('value', snapshot => {
             const val = snapshot.val();
             if (val) {
                 allData = Object.values(val).filter(i => i !== null);
@@ -189,12 +190,12 @@
         sortCurrentData();
         if (document.getElementById('results-card').style.display === 'block') startSearch();
         lucide.createIcons();
-    }
+    };
 
     function sortCurrentData() {
         allData.sort((a, b) => {
-            const dateA = parseThaiDate(a.spkdate);
-            const dateB = parseThaiDate(b.spkdate);
+            const dateA = parseThaiDate(a.spkdate || a.date);
+            const dateB = parseThaiDate(b.spkdate || b.date);
             return isNewestFirst ? dateB - dateA : dateA - dateB;
         });
     }
@@ -234,17 +235,25 @@
         items.forEach((item) => {
             const div = document.createElement('div');
             div.className = 'result-item';
+            
+            const safeName = (item.linkname || '').replace(/'/g, "\\'");
+            const safeLink = (item.link || '').replace(/'/g, "\\'");
+
             const actionButtons = item.link ? `
                 <div class="actions">
-                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'copy')"><i data-lucide="copy" class="icon"></i></button>
-                    <button class="btn-icon" onclick="handleAction('${item.linkname}', '${item.link}', 'open')"><i data-lucide="external-link" class="icon"></i></button>
+                    <button class="btn-icon" title="คัดลอกลิงก์" onclick="handleAction('${safeName}', '${safeLink}', 'copy', this)">
+                        <i data-lucide="copy" class="icon"></i>
+                    </button>
+                    <button class="btn-icon" title="เปิดดูคลิป" onclick="handleAction('${safeName}', '${safeLink}', 'open', this)">
+                        <i data-lucide="external-link" class="icon"></i>
+                    </button>
                 </div>
             ` : '';
 
             div.innerHTML = `
                 <div class="info">
                     <div class="link-name">${item.linkname || 'ไม่ระบุชื่อ'}</div>
-                    <div class="date"><i data-lucide="calendar" class="icon-sm"></i> ${formatThaiDisplay(item.spkdate)}</div>
+                    <div class="date"><i data-lucide="calendar" class="icon-sm"></i> ${formatThaiDisplay(item.spkdate || item.date)}</div>
                 </div>
                 ${actionButtons}
             `;
@@ -258,15 +267,31 @@
         document.getElementById('results-card').style.display = 'none';
     };
 
-    window.handleAction = function(name, url, type) {
+    window.handleAction = function(name, url, type, btnElement) {
+        if (isActionBusy) return;
+        isActionBusy = true;
+        setTimeout(() => { isActionBusy = false; }, 800);
+
+        // บันทึก Log ลง Firebase
         window.db.ref('logs').push({
-            user: window.auth.currentUser.email,
+            user: window.auth.currentUser ? window.auth.currentUser.email : "unknown",
             linkname: name,
             action: type,
             timestamp: new Date().toISOString()
         });
+
         if (type === 'copy') {
-            navigator.clipboard.writeText(url).then(() => alert('คัดลอกเรียบร้อย!'));
+            navigator.clipboard.writeText(url).then(() => {
+                if (btnElement) {
+                    const origHtml = btnElement.innerHTML;
+                    btnElement.innerHTML = '<i data-lucide="check" class="icon" style="color:#0f9d58;"></i>';
+                    lucide.createIcons();
+                    setTimeout(() => {
+                        btnElement.innerHTML = origHtml;
+                        lucide.createIcons();
+                    }, 1200);
+                }
+            });
         } else {
             window.open(url, '_blank');
         }

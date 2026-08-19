@@ -1,4 +1,146 @@
-// 2. สร้างตัวเลือกวันที่ใน Dropdown อัตโนมัติ (แปลงเป็นเวลาไทยก่อน)
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการฐานข้อมูล (Admin Dashboard)</title>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --primary: #1a73e8; --danger: #dc3545; --bg: #f8f9fa; --border: #e0e0e0; }
+        body { font-family: 'Sarabun', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .header h1 { margin: 0; font-size: 22px; display: flex; align-items: center; gap: 10px; color: #202124; }
+        
+        .controls { display: flex; gap: 15px; }
+        select, input { padding: 10px 15px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 15px; outline: none; }
+        select:focus, input:focus { border-color: var(--primary); }
+        
+        table { width: 100%; background: white; border-collapse: collapse; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: #f1f3f4; font-weight: bold; color: #5f6368; }
+        tr:hover { background: #f8f9fa; }
+        
+        .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; color: white; transition: 0.2s; }
+        .btn-edit { background: #fbbc04; color: #000; }
+        .btn-edit:hover { background: #f2a500; }
+        .btn-delete { background: var(--danger); }
+        .btn-delete:hover { background: #c82333; }
+        .btn-save { background: var(--primary); font-size: 15px; padding: 10px 20px; }
+        .btn-cancel { background: #6c757d; font-size: 15px; padding: 10px 20px; }
+
+        /* Modal / Popup */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal { background: white; padding: 25px; border-radius: 10px; width: 100%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal h2 { margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        .form-group input { width: 100%; box-sizing: border-box; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px; }
+
+        #loading { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; color: var(--primary); }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <i data-lucide="loader-2" class="spin" style="width: 40px; height: 40px; margin-bottom: 10px;"></i>
+    <span>กำลังโหลดฐานข้อมูล กรุณารอสักครู่...</span>
+</div>
+
+<div class="header">
+    <h1><i data-lucide="database"></i> ระบบจัดการฐานข้อมูล PublicSearch</h1>
+    <div class="controls">
+        <input type="text" id="searchInput" placeholder="ค้นหาชื่อไฟล์..." onkeyup="filterData()">
+        <select id="dateFilter" onchange="filterData()">
+            <option value="all">-- แสดงทุกวัน --</option>
+        </select>
+    </div>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th style="width: 15%;">วันที่ (Date)</th>
+            <th style="width: 40%;">ชื่อไฟล์ (Link Name)</th>
+            <th style="width: 25%;">วิดีโอลิงก์ (Video Link)</th>
+            <th style="width: 20%; text-align: center;">จัดการ</th>
+        </tr>
+    </thead>
+    <tbody id="tableBody">
+        <!-- ข้อมูลตารางจะถูกแทรกที่นี่ -->
+    </tbody>
+</table>
+
+<!-- Popup สำหรับแก้ไขข้อมูล -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal">
+        <h2><i data-lucide="edit"></i> แก้ไขข้อมูล</h2>
+        <input type="hidden" id="edit-original-key">
+        
+        <div class="form-group">
+            <label>ชื่อไฟล์ (Link Name)</label>
+            <input type="text" id="edit-linkname">
+        </div>
+        <div class="form-group">
+            <label>ลิงก์ Google Drive</label>
+            <input type="text" id="edit-link">
+        </div>
+        <div class="form-group">
+            <label>วันที่อภิปราย</label>
+            <input type="text" id="edit-date" placeholder="เช่น 2026-07-08T17:00:00.000Z">
+        </div>
+        
+        <div class="modal-actions">
+            <button class="btn btn-cancel" onclick="closeModal()">ยกเลิก</button>
+            <button class="btn btn-save" onclick="saveData()"><i data-lucide="save"></i> บันทึกข้อมูล</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ⚠️ ถ้าพี่เปลี่ยนชื่อโฟลเดอร์ PublicSearch เป็นชื่ออื่น อย่าลืมแก้ตรงนี้นะครับ
+    const secret = "AFZ2OqBiEJzlKKF8okPLi4mcj1VD4pa62EeWTndR";
+    const firebaseUrlBase = "https://linksearch-84695-default-rtdb.asia-southeast1.firebasedatabase.app/MixLinks"; 
+    
+    let rawData = {};
+    let dataArray = [];
+
+    window.onload = function() {
+        lucide.createIcons();
+        fetchDatabase();
+    };
+
+    // 1. ดึงข้อมูลทั้งหมดจาก Firebase
+    async function fetchDatabase() {
+        try {
+            const response = await fetch(`${firebaseUrlBase}.json?auth=${secret}`);
+            rawData = await response.json() || {};
+            
+            dataArray = Object.keys(rawData).map(key => ({
+                id: key, // Key ใน Firebase
+                ...rawData[key]
+            }));
+
+            // เรียงลำดับจากใหม่สุดไปเก่าสุด
+            dataArray.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            populateDateDropdown();
+            filterData();
+            
+            document.getElementById('loading').style.display = 'none';
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            alert("เกิดข้อผิดพลาดในการโหลดข้อมูล!");
+        }
+    }
+
+    // 2. สร้างตัวเลือกวันที่ใน Dropdown อัตโนมัติ (แปลงเป็นเวลาไทยก่อน)
     function populateDateDropdown() {
         const select = document.getElementById('dateFilter');
         const uniqueDates = new Set();
@@ -86,3 +228,91 @@
         
         lucide.createIcons();
     }
+
+    // 4. ฟังก์ชันลบข้อมูล (Delete)
+    async function deleteData(key) {
+        if (confirm("⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนี้? (ลบแล้วกู้คืนไม่ได้)")) {
+            document.getElementById('loading').style.display = 'flex';
+            try {
+                await fetch(`${firebaseUrlBase}/${encodeURIComponent(key)}.json?auth=${secret}`, {
+                    method: 'DELETE'
+                });
+                // โหลดข้อมูลใหม่เพื่อรีเฟรชหน้าจอ
+                fetchDatabase();
+            } catch (error) {
+                alert("เกิดข้อผิดพลาดในการลบข้อมูล");
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+    }
+
+    // 5. เปิดหน้าต่างแก้ไข (Edit)
+    function openModal(key) {
+        const item = rawData[key];
+        document.getElementById('edit-original-key').value = key;
+        document.getElementById('edit-linkname').value = item.linkname || '';
+        document.getElementById('edit-link').value = item.link || '';
+        document.getElementById('edit-date').value = item.date || '';
+        
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('editModal').style.display = 'none';
+    }
+
+    // 6. บันทึกข้อมูลที่แก้ไข (Save)
+    async function saveData() {
+        const oldKey = document.getElementById('edit-original-key').value;
+        const newLinkName = document.getElementById('edit-linkname').value.trim();
+        const newLink = document.getElementById('edit-link').value.trim();
+        const newDate = document.getElementById('edit-date').value.trim();
+        
+        if (!newLinkName) {
+            alert("กรุณากรอกชื่อไฟล์!"); return;
+        }
+
+        document.getElementById('loading').style.display = 'flex';
+        closeModal();
+
+        const updatedData = {
+            ...rawData[oldKey],
+            linkname: newLinkName,
+            link: newLink,
+            date: newDate,
+            spkdate: newDate // อัปเดตให้ตรงกัน
+        };
+
+        try {
+            // ถ้ามีการเปลี่ยนชื่อไฟล์ (ซึ่งคือ Key ในฐานข้อมูล) ต้องสร้าง Key ใหม่แล้วลบ Key เก่า
+            const safeNewKey = newLinkName.replace(/[\.\#\$\[\]\/]/g, "").trim();
+            
+            if (safeNewKey !== oldKey) {
+                // 1. สร้างของใหม่
+                await fetch(`${firebaseUrlBase}/${encodeURIComponent(safeNewKey)}.json?auth=${secret}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updatedData)
+                });
+                // 2. ลบของเก่า
+                await fetch(`${firebaseUrlBase}/${encodeURIComponent(oldKey)}.json?auth=${secret}`, {
+                    method: 'DELETE'
+                });
+            } else {
+                // ถ้าชื่อไฟล์เหมือนเดิม อัปเดตทับที่เดิมได้เลย (PATCH)
+                await fetch(`${firebaseUrlBase}/${encodeURIComponent(oldKey)}.json?auth=${secret}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ link: newLink, date: newDate, spkdate: newDate })
+                });
+            }
+
+            // โหลดข้อมูลใหม่
+            fetchDatabase();
+        } catch (error) {
+            alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+            document.getElementById('loading').style.display = 'none';
+        }
+    }
+</script>
+
+</body>
+</html>

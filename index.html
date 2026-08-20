@@ -165,7 +165,7 @@
 
     function loadData() {
         // ดึงข้อมูลจากโหนด PublicSearch (หรือ MixLinks ตามที่ใช้งาน)
-        window.db.ref('PublicSearch').on('value', snapshot => {
+        window.db.ref('MixLinks').on('value', snapshot => {
             const val = snapshot.val();
             if (val) {
                 allData = Object.values(val).filter(i => i !== null);

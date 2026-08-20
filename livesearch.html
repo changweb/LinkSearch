@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MixLinks - Search System v2.1</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background: #f0f2f5; margin: 0; padding: 0; color: #333; }
+        
+        .navbar { 
+            background: white; 
+            padding: 10px 20px; 
+            display: none; 
+            justify-content: space-between; 
+            align-items: center; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .nav-user { display: flex; align-items: center; gap: 15px; font-size: 14px; }
+        .user-email { color: #1a73e8; font-weight: bold; }
+        
+        .container { max-width: 700px; margin: 20px auto; padding: 0 15px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h2 { text-align: center; color: #1a73e8; margin-top: 0; font-size: 22px; }
+        
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; transition: 0.3s; }
+        input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+        
+        .btn-group { display: flex; gap: 10px; margin: 10px 0; }
+        button { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        
+        .btn-primary { background: #1a73e8; color: white; flex: 2; }
+        .btn-secondary { background: #e8f0fe; color: #1a73e8; flex: 1; }
+        .btn-sort { background: #fff; border: 1px solid #ddd; color: #5f6368; width: 100%; margin: 5px 0 15px 0; font-size: 14px; }
+        .btn-logout { background: #fff; color: #d93025; border: 1px solid #f8d7da; padding: 6px 12px; font-size: 13px; }
+        .btn-logout:hover { background: #fce8e6; }
+        
+        #search-section { display: none; }
+        .result-count { font-size: 13px; color: #70757a; margin-bottom: 12px; padding-left: 5px; border-left: 3px solid #1a73e8; }
+        .result-item { background: #fff; border-bottom: 1px solid #f1f3f4; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .info { flex-grow: 1; padding-right: 15px; }
+        .link-name { font-weight: bold; font-size: 1.05em; color: #202124; margin-bottom: 4px; line-height: 1.4; }
+        .date { font-size: 0.85em; color: #70757a; display: flex; align-items: center; gap: 4px; }
+        
+        .actions { display: flex; gap: 8px; }
+        .btn-icon { background: #fff; border: 1px solid #dadce0; padding: 8px; border-radius: 6px; cursor: pointer; color: #5f6368; transition: 0.2s; }
+        .btn-icon:hover { background: #f1f3f4; color: #1a73e8; border-color: #1a73e8; }
+        .icon { width: 16px; height: 16px; }
+        .icon-sm { width: 14px; height: 14px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar" id="top-nav">
+    <div style="font-weight: bold; color: #1a73e8;">MixLinks</div>
+    <div class="nav-user">
+        <span class="user-email" id="display-user"></span>
+        <button class="btn-logout" onclick="logout()">
+            <i data-lucide="log-out" class="icon-sm"></i> ออกจากระบบ
+        </button>
+    </div>
+</nav>
+
+<div class="container">
+    <div id="login-section" class="card">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <i data-lucide="shield-check" style="width: 48px; height: 48px; color: #1a73e8;"></i>
+        </div>
+        <h2>เข้าสู่ระบบเพื่อใช้งาน</h2>
+        <input type="email" id="email" placeholder="อีเมลผู้ใช้งาน">
+        <input type="password" id="password" placeholder="รหัสผ่าน">
+        <button class="btn-primary" onclick="login()" style="width: 100%;">ตกลง</button>
+    </div>
+
+    <div id="search-section">
+        <div class="card">
+            <h2>🔍 ค้นหา Link</h2>
+            <!-- 🎯 เปลี่ยนตรงนี้ให้เรียก startSearch() ทันทีที่พิมพ์ -->
+            <input type="text" id="searchInput" placeholder="พิมพ์ชื่อเรื่องที่ต้องการค้นหา..." oninput="startSearch()">
+            
+            <div class="btn-group">
+                <!-- ซ่อนปุ่มค้นหาเดิมไว้ เพราะพิมพ์แล้วหาให้อัตโนมัติเลย ทำให้ UI ดูคลีนขึ้น -->
+                <button class="btn-secondary" onclick="resetSearch()" style="flex: 1;"><i data-lucide="refresh-cw" class="icon"></i> ล้างการค้นหา</button>
+            </div>
+            
+            <button class="btn-sort" id="sortBtn" onclick="toggleSort()">
+                <i data-lucide="arrow-down-narrow-wide" class="icon"></i> <span id="sortText">เรียงจาก: ใหม่ไปเก่า</span>
+            </button>
+        </div>
+
+        <div id="results-card" style="display: none;">
+            <div id="count-display" class="result-count"></div>
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <div id="results-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCN3DS1X6pRi6LxckAitWHmLmsnx5WF7XA",
+        authDomain: "linksearch-84695.firebaseapp.com",
+        databaseURL: "https://linksearch-84695-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "linksearch-84695",
+        storageBucket: "linksearch-84695.appspot.com",
+        messagingSenderId: "886580157297",
+        appId: "1:886580157297:web:2d843a0f7db6948f9f74d0"
+    };
+
+    let allData = [];
+    let isNewestFirst = true;
+    let isActionBusy = false;
+
+    window.onload = function() {
+        firebase.initializeApp(firebaseConfig);
+        window.auth = firebase.auth();
+        window.db = firebase.database();
+
+        window.auth.onAuthStateChanged(user => {
+            const nav = document.getElementById('top-nav');
+            const loginSec = document.getElementById('login-section');
+            const searchSec = document.getElementById('search-section');
+            const displayUser = document.getElementById('display-user');
+
+            if (user) {
+                nav.style.display = 'flex';
+                loginSec.style.display = 'none';
+                searchSec.style.display = 'block';
+                displayUser.innerText = user.email;
+                loadData();
+            } else {
+                nav.style.display = 'none';
+                loginSec.style.display = 'block';
+                searchSec.style.display = 'none';
+                document.getElementById('results-card').style.display = 'none';
+            }
+        });
+        lucide.createIcons();
+    };
+
+    function parseThaiDate(dateStr) {
+        if (!dateStr) return 0;
+        try {
+            if (dateStr.includes('T')) return new Date(dateStr).getTime();
+            const parts = dateStr.split('/');
+            return new Date(parseInt(parts[2]) - 543, parseInt(parts[1]) - 1, parseInt(parts[0])).getTime();
+        } catch (e) { return 0; }
+    }
+
+    function formatThaiDisplay(isoString) {
+        if (!isoString) return '-';
+        try {
+            const date = new Date(isoString);
+            return date.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' });
+        } catch (e) { return isoString; }
+    }
+
+    function loadData() {
+        // 🎯 ดึงข้อมูลจาก MixLinks 
+        window.db.ref('MixLinks').on('value', snapshot => {
+            const val = snapshot.val();
+            if (val) {
+                allData = Object.values(val).filter(i => i !== null);
+                sortCurrentData();
+                // ถ้ามีข้อความค้างอยู่ในช่องค้นหา ให้ค้นหาใหม่ทันทีที่ข้อมูลโหลดเสร็จ
+                if(document.getElementById('searchInput').value.trim() !== '') {
+                    startSearch();
+                }
+            }
+        });
+    }
+
+    window.toggleSort = function() {
+        isNewestFirst = !isNewestFirst;
+        const btnText = document.getElementById('sortText');
+        const sortBtn = document.getElementById('sortBtn');
+        
+        if (isNewestFirst) {
+            btnText.innerText = "เรียงจาก: ใหม่ไปเก่า";
+            sortBtn.innerHTML = `<i data-lucide="arrow-down-narrow-wide" class="icon"></i> <span id="sortText">${btnText.innerText}</span>`;
+        } else {
+            btnText.innerText = "เรียงจาก: เก่าไปใหม่";
+            sortBtn.innerHTML = `<i data-lucide="arrow-up-wide-narrow" class="icon"></i> <span id="sortText">${btnText.innerText}</span>`;
+        }
+        
+        sortCurrentData();
+        if (document.getElementById('results-card').style.display === 'block') startSearch();
+        lucide.createIcons();
+    };
+
+    function sortCurrentData() {
+        allData.sort((a, b) => {
+            const dateA = parseThaiDate(a.spkdate || a.date);
+            const dateB = parseThaiDate(b.spkdate || b.date);
+            return isNewestFirst ? dateB - dateA : dateA - dateB;
+        });
+    }
+
+    // 🎯 ระบบค้นหาที่ทำงานทันทีเมื่อพิมพ์
+    window.startSearch = function() {
+        const query = document.getElementById('searchInput').value.toLowerCase().trim();
+        const resultsCard = document.getElementById('results-card');
+        
+        // ถ้าช่องค้นหาว่างเปล่า ให้ซ่อนกล่องผลลัพธ์ไปเลย
+        if (query === "") {
+            resultsCard.style.display = 'none';
+            return;
+        }
+
+        const terms = query.split(' ').filter(t => t !== '');
+        const filtered = allData.filter(item => {
+            const name = (item.linkname || "").toLowerCase();
+            return terms.every(term => name.includes(term));
+        });
+
+        displayResults(filtered);
+    };
+
+    function displayResults(items) {
+        const container = document.getElementById('results-list');
+        const countDisplay = document.getElementById('count-display');
+        container.innerHTML = '';
+        
+        document.getElementById('results-card').style.display = 'block';
+        countDisplay.innerText = `รายการที่พบทั้งหมด ${items.length} รายการ`;
+
+        if (items.length === 0) {
+            container.innerHTML = '<div style="padding:40px; text-align:center; color:#888;">ไม่พบข้อมูล</div>';
+            return;
+        }
+
+        items.forEach((item) => {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            
+            const safeName = (item.linkname || '').replace(/'/g, "\\'");
+            const safeLink = (item.link || '').replace(/'/g, "\\'");
+
+            const actionButtons = item.link ? `
+                <div class="actions">
+                    <button class="btn-icon" title="คัดลอกลิงก์" onclick="handleAction('${safeName}', '${safeLink}', 'copy', this)">
+                        <i data-lucide="copy" class="icon"></i>
+                    </button>
+                    <button class="btn-icon" title="เปิดดูคลิป" onclick="handleAction('${safeName}', '${safeLink}', 'open', this)">
+                        <i data-lucide="external-link" class="icon"></i>
+                    </button>
+                </div>
+            ` : '';
+
+            div.innerHTML = `
+                <div class="info">
+                    <div class="link-name">${item.linkname || 'ไม่ระบุชื่อ'}</div>
+                    <div class="date"><i data-lucide="calendar" class="icon-sm"></i> ${formatThaiDisplay(item.spkdate || item.date)}</div>
+                </div>
+                ${actionButtons}
+            `;
+            container.appendChild(div);
+        });
+        lucide.createIcons();
+    }
+
+    window.resetSearch = function() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('results-card').style.display = 'none';
+    };
+
+    window.handleAction = function(name, url, type, btnElement) {
+        if (isActionBusy) return;
+        isActionBusy = true;
+        setTimeout(() => { isActionBusy = false; }, 800);
+
+        // บันทึก Log ลง Firebase
+        window.db.ref('logs').push({
+            user: window.auth.currentUser ? window.auth.currentUser.email : "unknown",
+            linkname: name,
+            action: type,
+            timestamp: new Date().toISOString()
+        });
+
+        if (type === 'copy') {
+            navigator.clipboard.writeText(url).then(() => {
+                if (btnElement) {
+                    const origHtml = btnElement.innerHTML;
+                    btnElement.innerHTML = '<i data-lucide="check" class="icon" style="color:#0f9d58;"></i>';
+                    lucide.createIcons();
+                    setTimeout(() => {
+                        btnElement.innerHTML = origHtml;
+                        lucide.createIcons();
+                    }, 1200);
+                }
+            });
+        } else {
+            window.open(url, '_blank');
+        }
+    };
+
+    window.login = function() {
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('password').value;
+        window.auth.signInWithEmailAndPassword(email, pass).catch(() => alert("อีเมลหรือรหัสผ่านไม่ถูกต้อง"));
+    };
+
+    window.logout = function() { window.auth.signOut(); };
+</script>
+</body>
+</html>
